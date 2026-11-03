@@ -1,0 +1,72 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <!-- Plugin "OBS Studio" do OpenWigiDashManager (.NET 10, SDK 3.0). Fala com o OBS pelo obs-websocket v5. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>OpenWigiDash.ObsPlugin</RootNamespace>
+    <AssemblyName>OpenWigiDash.ObsPlugin</AssemblyName>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <Authors>Victor Perez</Authors>
+    <Product>OBS Studio</Product>
+    <Description>Controle do OBS Studio no WigiDash (OpenWigiDashManager): gravar, live, cenas, mixer de áudio, replay buffer e câmera virtual, com tempo, nível de áudio e miniatura da cena no tile.</Description>
+  </PropertyGroup>
+
+  <!-- `dotnet pack` gera o pacote de plugin para o nuget.org (docs/sdk.md do OpenWigiDashManager,
+       "Publicar no nuget.org"). Enquanto o SDK for preview, o plugin também é (NU5104). -->
+  <PropertyGroup>
+    <OpenWigiDashPlugin>true</OpenWigiDashPlugin>
+    <PackageId>OpenWigiDash.OBS</PackageId>
+    <Title>OBS Studio</Title>
+    <Version>1.0.0-preview.1</Version>
+    <PackageTags>obs;obs-studio;obs-websocket;stream;live;recording;scenes</PackageTags>
+    <PackageProjectUrl>https://github.com/OpenWigiDash/OpenWigiDash-OBS-Plugin</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/OpenWigiDash/OpenWigiDash-OBS-Plugin</RepositoryUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
+  </PropertyGroup>
+
+  <!-- O SDK vem do nuget.org. Para testar mudanças no SDK antes de publicar, compile com
+       -p:UseLocalOpenWigiSdk=true e o repo OpenWigiDashManager clonado ao lado deste. -->
+  <PropertyGroup>
+    <OpenWigiSdkVersion>3.0.0-preview.1</OpenWigiSdkVersion>
+    <OpenWigiSdkProject Condition="'$(OpenWigiSdkProject)' == ''">$(MSBuildThisFileDirectory)..\OpenWigiDashManager\src\OpenWigi.Sdk\OpenWigi.Sdk.csproj</OpenWigiSdkProject>
+  </PropertyGroup>
+
+  <!-- Contrato e UI vêm do host (uma cópia só): o plugin compila contra eles mas não leva junto. -->
+  <ItemGroup Condition="'$(UseLocalOpenWigiSdk)' == 'true'">
+    <ProjectReference Include="$(OpenWigiSdkProject)" Private="false" ExcludeAssets="runtime" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(UseLocalOpenWigiSdk)' != 'true'">
+    <PackageReference Include="OpenWigiDash.Sdk" Version="$(OpenWigiSdkVersion)" ExcludeAssets="runtime" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MudBlazor" Version="9.11.0" ExcludeAssets="runtime" />
+    <PackageReference Include="System.Drawing.Common" Version="10.0.14" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.0" />
+  </ItemGroup>
+
+  <!-- Pelo pacote, o NuGet importa o .targets do SDK sozinho; pela referência de projeto, importamos à mão. -->
+  <Import Project="$([System.IO.Path]::GetDirectoryName($(OpenWigiSdkProject)))\build\OpenWigiDash.Sdk.targets"
+          Condition="'$(UseLocalOpenWigiSdk)' == 'true'" />
+
+  <ItemGroup>
+    <None Include="icon.png" CopyToOutputDirectory="PreserveNewest" Pack="true" PackagePath="\" Condition="Exists('icon.png')" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ObsPlugin.Tests" />
+  </ItemGroup>
+
+  <!-- Os testes têm projeto próprio. -->
+  <ItemGroup>
+    <Compile Remove="tests\**" />
+    <Content Remove="tests\**" />
+    <None Remove="tests\**" />
+  </ItemGroup>
+
+</Project>

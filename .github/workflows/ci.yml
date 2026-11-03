@@ -1,0 +1,28 @@
+name: CI
+
+# Build e testes em cada PR e em cada push na main. Não publica nada.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Test
+      run: dotnet test tests/ObsPlugin.Tests
+
+    - name: Pack (confere o pacote de plugin)
+      run: dotnet pack ObsPlugin.csproj -c Release -o nupkgs

@@ -1,0 +1,21 @@
+@inherits WidgetSettingsComponent<ObsTileInstance>
+@implements IDisposable
+
+@* Configurações de qualquer widget do OBS: a conexão (igual para todos) e as opções do widget, se ele tiver. *@
+<MudStack Spacing="4">
+    <ConnectionPanel Session="Instance.Session" />
+
+    @if (Instance.OptionsComponent is { } options)
+    {
+        <MudDivider />
+        <DynamicComponent Type="options" Parameters="@(new Dictionary<string, object?> { ["Instance"] = Instance })" />
+    }
+</MudStack>
+
+@code {
+    protected override void OnInitialized() => Instance.Changed += OnChanged;
+
+    public void Dispose() => Instance.Changed -= OnChanged;
+
+    private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+}

@@ -1,0 +1,12 @@
+@* Opções do widget Gravar. *@
+<MudSelect T="RecordLongPress" Value="Instance.LongPressAction" ValueChanged="v => Instance.SetLongPressAsync(v)"
+           Label="Segurar o tile durante a gravação" Variant="Variant.Outlined"
+           HelperText="Capítulo só funciona com a gravação em Hybrid MP4 (OBS 30.2 ou mais novo).">
+    <MudSelectItem Value="RecordLongPress.Pause">Pausa e retoma</MudSelectItem>
+    <MudSelectItem Value="RecordLongPress.Chapter">Marca um capítulo</MudSelectItem>
+</MudSelect>
+
+@code {
+    [Parameter, EditorRequired]
+    public RecordInstance Instance { get; set; } = default!;
+}

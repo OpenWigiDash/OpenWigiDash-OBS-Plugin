@@ -1,0 +1,95 @@
+name: Release Widget (OpenWigiDash)
+
+# Uma tag v* (ex.: v1.0.0-preview.1) gera:
+# - o pacote de plugin no nuget.org (OpenWigiDash.OBS), que o Manager instala;
+# - o zip na release do GitHub, para quem instala à mão.
+# A versão do pacote é a da tag sem o "v". Publica por Trusted Publishing (sem chave guardada):
+# a política no nuget.org aponta para este repositório e este workflow, e o usuário é vars.NUGET_USER (sem ela, victorperez2911).
+#
+# Também roda à mão (Actions > Release Widget > Run workflow, na main) com a versão sem o "v": publica do
+# commit escolhido e a release cria a tag v<versão> nele. Assim a publicação não depende de alguém
+# empurrar a tag (as threads do Claude não podem).
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Versão SemVer sem o "v" (ex.: 1.0.0-preview.1). Preview enquanto o SDK for preview.'
+        required: true
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    env:
+      WIDGET_NAME: "OpenWigiDash.OBS"
+      CONFIGURATION: "Release"
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Version
+      shell: pwsh
+      env:
+        INPUT_VERSION: ${{ inputs.version }}
+      run: |
+        if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
+          $version = $env:INPUT_VERSION.Trim() -replace '^v', ''
+          if ($version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') { throw "Versão inválida: $version" }
+        } else {
+          $version = '${{ github.ref_name }}' -replace '^v', ''
+        }
+        echo "PACKAGE_VERSION=$version" >> $env:GITHUB_ENV
+        echo "TAG=v$version" >> $env:GITHUB_ENV
+
+    - name: Test
+      run: dotnet test tests/ObsPlugin.Tests -c ${{ env.CONFIGURATION }}
+
+    - name: Pack
+      run: dotnet pack ObsPlugin.csproj -c ${{ env.CONFIGURATION }} -o nupkgs /p:Version=${{ env.PACKAGE_VERSION }}
+
+    - name: Publish
+      run: dotnet publish ObsPlugin.csproj -c ${{ env.CONFIGURATION }} -o dist/${{ env.WIDGET_NAME }} /p:Version=${{ env.PACKAGE_VERSION }}
+
+    - name: Zip
+      shell: pwsh
+      run: |
+        $zipName = "OpenWigiDash-OBS-${{ env.TAG }}.zip"
+        Get-ChildItem "dist\${{ env.WIDGET_NAME }}" | ForEach-Object { Write-Host "  - $($_.Name)" }
+        Compress-Archive -Path "dist\${{ env.WIDGET_NAME }}" -DestinationPath $zipName
+        echo "ZIP_NAME=$zipName" >> $env:GITHUB_ENV
+
+    - name: NuGet login (Trusted Publishing)
+      uses: NuGet/login@v1
+      id: nuget
+      with:
+        user: ${{ vars.NUGET_USER || 'victorperez2911' }}
+
+    - name: Push to nuget.org
+      shell: pwsh
+      # No runner Windows o curinga não chega expandido ao dotnet: um push por arquivo.
+      run: |
+        Get-ChildItem nupkgs -Filter *.nupkg | ForEach-Object {
+          dotnet nuget push $_.FullName --api-key "${{ steps.nuget.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        }
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ env.TAG }}
+        target_commitish: ${{ github.sha }}
+        files: ${{ env.ZIP_NAME }}
+        generate_release_notes: true
+        prerelease: ${{ contains(env.PACKAGE_VERSION, '-') }}

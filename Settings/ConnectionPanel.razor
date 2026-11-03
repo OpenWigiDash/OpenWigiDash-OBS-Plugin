@@ -1,0 +1,108 @@
+@using OpenWigiDash.ObsPlugin.Obs
+@implements IDisposable
+
+@* Endereço e senha do obs-websocket. Vale para todos os widgets do OBS (uma conexão só). *@
+<MudStack Spacing="3">
+    <MudAlert Severity="@StateSeverity" Dense="true" Variant="Variant.Outlined">
+        @StateText
+        @if (Session.ConnectionState is not (ObsConnectionState.Ready or ObsConnectionState.Connecting) && Session.LastError is { } error)
+        {
+            <MudText Typo="Typo.caption" Style="display:block;opacity:.8">Detalhe: @error</MudText>
+            <MudText Typo="Typo.caption" Style="display:block;opacity:.8">Log: %LOCALAPPDATA%\OpenWigiDash\WidgetData\OBS\obs.log</MudText>
+        }
+    </MudAlert>
+
+    <MudStack Row="true" AlignItems="AlignItems.Start" Spacing="2">
+        <MudTextField T="string" @bind-Value="_host" Label="Endereço" Variant="Variant.Outlined" Style="min-width:200px"
+                      HelperText="127.0.0.1 quando o OBS roda neste PC." />
+        <MudNumericField T="int" @bind-Value="_port" Label="Porta" Variant="Variant.Outlined" Min="1" Max="65535"
+                         HideSpinButtons="true" Style="max-width:120px" />
+    </MudStack>
+
+    <MudTextField T="string" @bind-Value="_password" Label="Senha do servidor WebSocket" Variant="Variant.Outlined"
+                  InputType="@(_showPassword ? InputType.Text : InputType.Password)"
+                  Adornment="Adornment.End" AdornmentIcon="@(_showPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                  OnAdornmentClick="() => _showPassword = !_showPassword"
+                  HelperText="No OBS: Ferramentas > Configurações do servidor WebSocket > Mostrar informações de conexão. Fica guardada criptografada só para o seu usuário do Windows." />
+
+    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save" OnClick="Save">Salvar e conectar</MudButton>
+        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Search" OnClick="Detect">Detectar neste PC</MudButton>
+        <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Refresh" OnClick="Session.Reconnect">Tentar de novo</MudButton>
+    </MudStack>
+
+    @if (_message is { } message)
+    {
+        <MudText Typo="Typo.caption" Color="@(_messageOk ? Color.Success : Color.Warning)">@message</MudText>
+    }
+</MudStack>
+
+@code {
+    [Parameter, EditorRequired]
+    public ObsSession Session { get; set; } = default!;
+
+    private string? _host;
+    private int _port;
+    private string? _password;
+    private bool _showPassword;
+    private string? _message;
+    private bool _messageOk;
+
+    protected override void OnInitialized()
+    {
+        var saved = ObsConnectionStore.Default.Load();
+        (_host, _port, _password) = (saved.Host, saved.Port, saved.Password);
+        Session.Changed += OnChanged;
+    }
+
+    public void Dispose() => Session.Changed -= OnChanged;
+
+    private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private void Save()
+    {
+        var host = string.IsNullOrWhiteSpace(_host) ? ObsEndpoint.Default.Host : _host.Trim();
+        var port = _port is > 0 and <= 65535 ? _port : ObsEndpoint.DefaultPort;
+        ObsConnectionStore.Default.Save(new ObsEndpoint(host, port, string.IsNullOrEmpty(_password) ? null : _password));
+        (_host, _port) = (host, port);
+        Show("Salvo. Conectando…", ok: true);
+        Session.Reconnect();
+    }
+
+    /// <summary>Lê a configuração do obs-websocket deste PC, só quando a pessoa pede.</summary>
+    private void Detect()
+    {
+        if (ObsLocalConfig.TryRead() is not { } config)
+        {
+            Show("Não achei a configuração do OBS neste PC. O OBS 28 ou mais novo está instalado?", ok: false);
+            return;
+        }
+        _host = ObsEndpoint.Default.Host;
+        _port = config.Port;
+        _password = config.AuthRequired ? config.Password : null;
+        Show(config.Enabled
+            ? "Achei a porta e a senha. Confira e clique em Salvar e conectar."
+            : "Achei, mas o servidor WebSocket está desligado. No OBS: Ferramentas > Configurações do servidor WebSocket > Ativar.",
+            ok: config.Enabled);
+    }
+
+    private void Show(string text, bool ok) => (_message, _messageOk) = (text, ok);
+
+    private Severity StateSeverity => Session.ConnectionState switch
+    {
+        ObsConnectionState.Ready => Severity.Success,
+        ObsConnectionState.Connecting => Severity.Info,
+        ObsConnectionState.Unavailable => Severity.Warning,
+        _ => Severity.Error,
+    };
+
+    private string StateText => Session.ConnectionState switch
+    {
+        ObsConnectionState.Ready => $"Conectado ao OBS{(Session.State.ObsVersion is { } v ? " " + v : "")} em {Session.Address}.",
+        ObsConnectionState.Unavailable => "O OBS não está aberto (ou o servidor WebSocket está desligado). Os tiles voltam sozinhos quando ele abrir.",
+        ObsConnectionState.NeedsPassword => "O OBS pede senha. Cole a senha abaixo ou clique em Detectar neste PC.",
+        ObsConnectionState.AuthFailed => "O OBS recusou a senha. Confira em Mostrar informações de conexão.",
+        ObsConnectionState.Unsupported => "Este OBS é antigo demais. Precisa do OBS 28 ou mais novo (obs-websocket 5).",
+        _ => "Conectando ao OBS…",
+    };
+}

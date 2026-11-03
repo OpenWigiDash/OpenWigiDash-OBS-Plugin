@@ -1,0 +1,30 @@
+@* Opções do widget Mixer de áudio. *@
+<MudStack Spacing="3">
+    <MudSelect T="string" Value="@Instance.Input" ValueChanged="v => Instance.SetInputAsync(v)" Label="Fonte de áudio"
+               Variant="Variant.Outlined" Style="min-width:280px">
+        @foreach (var input in Instance.AvailableInputs)
+        {
+            <MudSelectItem Value="@input.Name">@input.Name</MudSelectItem>
+        }
+        @if (Instance.Input is { } chosen && Instance.AvailableInputs.All(i => i.Name != chosen))
+        {
+            <MudSelectItem Value="@chosen">@($"{chosen} · não existe agora")</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudSelect T="MixerMode" Value="Instance.Mode" ValueChanged="v => Instance.SetModeAsync(v)" Label="Toque" Variant="Variant.Outlined">
+        <MudSelectItem Value="MixerMode.Toggle">Muta e desmuta (segurar inverte enquanto segura)</MudSelectItem>
+        <MudSelectItem Value="MixerMode.PushToTalk">Push to talk: segure para falar</MudSelectItem>
+        <MudSelectItem Value="MixerMode.PushToMute">Push to mute: segure para mutar</MudSelectItem>
+    </MudSelect>
+
+    <div>
+        <MudText Typo="Typo.overline" Color="Color.Secondary">Bordas do Wide mudam @Instance.StepDb.ToString("0.#") dB por toque</MudText>
+        <MudSlider T="double" Value="Instance.StepDb" ValueChanged="v => Instance.SetStepAsync(v)" Min="0.5" Max="6" Step="0.5" Color="Color.Primary" />
+    </div>
+</MudStack>
+
+@code {
+    [Parameter, EditorRequired]
+    public MixerInstance Instance { get; set; } = default!;
+}
