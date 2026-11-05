@@ -58,7 +58,7 @@ A senha fica em `%LOCALAPPDATA%\OpenWigiDash\WidgetData\OBS\connection.json`, cr
 | Parar a live com um toque sem querer | Encerrar pede long-press |
 | Precisa do plugin do Elgato instalado no OBS | Usa o obs-websocket que já vem no OBS |
 
-Os ícones são vetores do próprio plugin (gravar, live, microfone, replay, cena...), desenhados para a tela escura do
+Os ícones dos tiles são vetores do próprio plugin (gravar, live, microfone, replay, cena...), desenhados para a tela escura do
 WigiDash. Não usam o logo nem a arte do OBS.
 
 ## Requisitos
