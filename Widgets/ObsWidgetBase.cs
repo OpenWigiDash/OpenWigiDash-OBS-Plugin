@@ -22,6 +22,9 @@ public abstract class ObsWidgetBase : IWidget
     /// <summary>O tile como aparece no catálogo "Adicionar widget".</summary>
     protected abstract TileVisual Preview { get; }
 
+    /// <summary>A prévia do catálogo, para os testes.</summary>
+    internal TileVisual PreviewVisual => Preview;
+
     protected abstract ObsTileInstance CreateInstance(IWidgetContext context);
 
     public ValueTask LoadAsync(IWidgetHost host, CancellationToken cancellationToken)

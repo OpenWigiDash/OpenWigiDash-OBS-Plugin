@@ -163,6 +163,16 @@ public class SourcesVisualTests
     }
 
     [Fact]
+    public void CatalogPreviews_ShowSampleTimes()
+    {
+        // O tempo de exemplo é contado a partir do ObservedAt: sem ele, a prévia mostrava ~17 milhões de horas.
+        Assert.Equal("00:12:07", new RecordWidget().PreviewVisual.Big);
+        Assert.Equal("01:02:33", new StreamWidget().PreviewVisual.Big);
+        Assert.Equal("Ao vivo 00:42:00", new StatusWidget().PreviewVisual.Pill);
+        Assert.Equal("−00:18", new MediaWidget().PreviewVisual.ProgressText);
+    }
+
+    [Fact]
     public void Media()
     {
         var playing = MediaInstance.Visual("Vinheta", new MediaStatus("OBS_MEDIA_STATE_PLAYING", 90_000, 30_000, T0), T0 + TimeSpan.FromSeconds(15));
