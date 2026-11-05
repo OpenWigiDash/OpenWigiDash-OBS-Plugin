@@ -1,0 +1,23 @@
+@* Opções do widget Cena. *@
+<MudStack Spacing="3">
+    <MudSelect T="string" Value="@Instance.Scene" ValueChanged="v => Instance.SetSceneAsync(v)" Label="Cena"
+               Variant="Variant.Outlined" Style="min-width:280px"
+               HelperText="Toque troca para ela (no modo estúdio, para a prévia). Segure para mandar direto para o ar.">
+        @foreach (var scene in Instance.AvailableScenes)
+        {
+            <MudSelectItem Value="@scene">@scene</MudSelectItem>
+        }
+        @if (Instance.Scene is { } chosen && !Instance.AvailableScenes.Contains(chosen))
+        {
+            <MudSelectItem Value="@chosen">@($"{chosen} · não existe agora")</MudSelectItem>
+        }
+    </MudSelect>
+    <MudCheckBox T="bool" Value="Instance.ShowThumbnail" ValueChanged="v => Instance.SetShowThumbnailAsync(v)" Color="Color.Primary">
+        Miniatura ao vivo no Wide e no Large (1 quadro por segundo)
+    </MudCheckBox>
+</MudStack>
+
+@code {
+    [Parameter, EditorRequired]
+    public SceneInstance Instance { get; set; } = default!;
+}
