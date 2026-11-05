@@ -56,6 +56,7 @@
   <ItemGroup>
     <None Include="icon.png" CopyToOutputDirectory="PreserveNewest" Pack="true" PackagePath="\" Condition="Exists('icon.png')" />
     <None Include="README.md" Pack="true" PackagePath="\" />
+    <EmbeddedResource Include="Rendering\obs-logo-mask.png" LogicalName="OpenWigiDash.ObsPlugin.Rendering.obs-logo-mask.png" />
   </ItemGroup>
 
   <ItemGroup>

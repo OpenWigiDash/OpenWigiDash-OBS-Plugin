@@ -189,6 +189,8 @@ public sealed class ReplayBufferWidget : ObsWidgetBase
         "Toque salva o replay (e liga o buffer se estiver desligado); segure para desligar o buffer.",
         WidgetSize.Mini, WidgetSize.Small);
 
+    protected override string CatalogLabel => "Replay";
+
     protected override TileVisual Preview => ReplayBufferInstance.Visual(true, null, null, DateTimeOffset.UnixEpoch);
 
     protected override ObsTileInstance CreateInstance(IWidgetContext context) => new ReplayBufferInstance(context);

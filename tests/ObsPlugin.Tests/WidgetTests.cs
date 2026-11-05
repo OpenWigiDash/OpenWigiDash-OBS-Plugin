@@ -326,4 +326,17 @@ public sealed class TileTests : IAsyncLifetime
         Assert.All(widgets, w => Assert.StartsWith("OBS: ", w.Manifest.Name));
         await Task.CompletedTask;
     }
+
+    [Fact]
+    public void CatalogIcons_FollowOnePattern()
+    {
+        // Todos no mesmo layout (ícone + nome curto), sem miniatura do tile, e cada um com ícone próprio.
+        ObsWidgetBase[] widgets = [new RecordWidget(), new StreamWidget(), new SceneWidget(), new MixerWidget(), new ReplayBufferWidget(), new VirtualCamWidget(),
+            new ScenePanelWidget(), new StatusWidget(), new SourceVisibilityWidget(), new FilterWidget(), new StudioModeWidget(), new TransitionWidget(), new MediaWidget()];
+        Assert.All(widgets, w => Assert.Equal(TileLayout.Catalog, w.CatalogVisual.Layout));
+        Assert.All(widgets, w => Assert.InRange(w.CatalogVisual.Big!.Length, 1, 14));
+        Assert.Equal(widgets.Length, widgets.Select(w => w.CatalogVisual.Icon).Distinct().Count());
+        Assert.Equal("Cenas", new ScenePanelWidget().CatalogVisual.Big);
+        Assert.Equal("Câmera virtual", new VirtualCamWidget().CatalogVisual.Big);
+    }
 }
