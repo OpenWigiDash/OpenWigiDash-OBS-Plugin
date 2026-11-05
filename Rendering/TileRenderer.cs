@@ -38,6 +38,12 @@ public static class TileRenderer
                 case TileLayout.Offline:
                     DrawOffline(g, size, fonts, visual, mini);
                     break;
+                case TileLayout.Grid:
+                    DrawGrid(g, size, fonts, visual);
+                    break;
+                case TileLayout.Stats when !mini:
+                    DrawStats(g, size, fonts, visual, background, wide);
+                    break;
                 case TileLayout.Thumbnail when !mini:
                     DrawThumbnail(g, size, fonts, visual, background);
                     break;
@@ -113,6 +119,8 @@ public static class TileRenderer
         var bottom = new RectangleF(padX, size.Height - padY - 16 * k, size.Width - padX * 2, 16 * k);
         if (v.Meter is { } level)
             DrawMeter(g, new RectangleF(bottom.X, bottom.Bottom - 8 * k, bottom.Width, 8 * k), level, v.Slashed);
+        else if (v.Progress is not null || v.ProgressText is not null)
+            DrawProgress(g, fonts, v, bottom, k);
         else if (!string.IsNullOrEmpty(v.Detail))
         {
             using var font = fonts.Regular(Math.Max(11f, 12.5f * k));
@@ -145,7 +153,8 @@ public static class TileRenderer
         var captionHeight = 18 * k;
         var bigEm = !string.IsNullOrEmpty(v.Big) ? BigSize(v.Big!, width, k * 1.12f, fonts, g) : 0;
         var bigHeight = bigEm * 1.15f;
-        var detailHeight = string.IsNullOrEmpty(v.Detail) ? 0 : 18 * k;
+        var hasProgress = v.Progress is not null || v.ProgressText is not null;
+        var detailHeight = string.IsNullOrEmpty(v.Detail) && !hasProgress ? 0 : 18 * k;
         var gap = 7 * k;
         var total = captionHeight + gap + bigHeight + (detailHeight > 0 ? gap + detailHeight : 0);
         var y = (size.Height - total) / 2;
@@ -158,7 +167,11 @@ public static class TileRenderer
             DrawText(g, v.Big!, font, v.BigDim ? TilePalette.Dim : TilePalette.Ink, new RectangleF(x - 2 * k, y, width + 4 * k, bigHeight), StringAlignment.Near);
             y += bigHeight + gap;
         }
-        if (detailHeight > 0)
+        if (hasProgress)
+        {
+            DrawProgress(g, fonts, v, new RectangleF(x, y, width, detailHeight), k);
+        }
+        else if (detailHeight > 0)
         {
             using var font = fonts.Regular(Math.Max(11f, 12.5f * k));
             var detailRect = new RectangleF(x, y, width, detailHeight);
@@ -265,6 +278,98 @@ public static class TileRenderer
         {
             using var font = fonts.Regular(13f * Math.Max(1f, size.Height / RefHeight));
             DrawText(g, v.Detail!, font, TilePalette.Dim, new RectangleF(6, iconRect.Bottom + 8, size.Width - 12, textHeight), StringAlignment.Center);
+        }
+    }
+
+    /// <summary>Painel de cenas: uma célula por cena, verde a do programa, anel azul na prévia.</summary>
+    private static void DrawGrid(Graphics g, PixelSize size, Fonts fonts, TileVisual v)
+    {
+        var cells = v.Cells ?? [];
+        var (columns, rows) = GridLayout.Shape(size);
+        for (var i = 0; i < cells.Count && i < columns * rows; i++)
+        {
+            var cell = cells[i];
+            var rect = GridLayout.Cell(size, columns, rows, i);
+            var radius = Math.Min(10f, rect.Height * 0.18f);
+            using (var path = ObsGlyphs.Rounded(rect, radius))
+            {
+                using (var brush = new SolidBrush(cell.Fill is { } fill ? TilePalette.Tint(fill, 0.42) : TilePalette.Panel))
+                    g.FillPath(brush, path);
+                if ((cell.Ring ?? cell.Fill) is { } ringColor)
+                {
+                    using var pen = new Pen(ringColor, 2.5f);
+                    using var inner = ObsGlyphs.Rounded(RectangleF.Inflate(rect, -1.25f, -1.25f), radius - 1);
+                    g.DrawPath(pen, inner);
+                }
+            }
+            var em = Math.Clamp(rect.Height * 0.24f, 11f, 17f);
+            using var font = cell.More ? fonts.Regular(em) : fonts.Bold(em);
+            using var brushText = new SolidBrush(cell.More ? TilePalette.Dim : TilePalette.Ink);
+            using var format = new StringFormat
+            {
+                Alignment = StringAlignment.Center,
+                LineAlignment = StringAlignment.Center,
+                Trimming = StringTrimming.EllipsisWord,
+            };
+            g.DrawString(cell.Text, font, brushText, RectangleF.Inflate(rect, -6, -4), format);
+        }
+        if (cells.Count == 0 && !string.IsNullOrEmpty(v.Detail))
+        {
+            using var font = fonts.Regular(14);
+            DrawText(g, v.Detail!, font, TilePalette.Dim, new RectangleF(0, 0, size.Width, size.Height), StringAlignment.Center);
+        }
+    }
+
+    /// <summary>Status: rótulo (ou pílula REC/LIVE) e linhas de valor; no Wide, o minigráfico da CPU à direita.</summary>
+    private static void DrawStats(Graphics g, PixelSize size, Fonts fonts, TileVisual v, Color background, bool wide)
+    {
+        var k = Math.Min(size.Width / (wide ? 400f : RefWidth), size.Height / RefHeight);
+        var pad = 14 * k;
+        var iconSide = 22 * k;
+        DrawCaption(g, fonts, v, new RectangleF(pad, pad, size.Width - pad * 2 - iconSide - 6, iconSide), k);
+        ObsGlyphs.Draw(g, v.Icon, new RectangleF(size.Width - pad - iconSide, pad, iconSide, iconSide), IconColor(v), v.Slashed, background);
+
+        var top = pad + iconSide + 6 * k;
+        var listWidth = wide ? size.Width * 0.46f : size.Width - pad * 2;
+        var lines = v.Lines ?? [];
+        var lineHeight = Math.Min(24 * k, (size.Height - top - pad) / Math.Max(1, lines.Count));
+        using var labelFont = fonts.Regular(Math.Max(11f, 12.5f * k));
+        using var valueFont = fonts.Bold(Math.Max(12f, 15f * k));
+        for (var i = 0; i < lines.Count; i++)
+        {
+            var row = new RectangleF(pad, top + i * lineHeight, listWidth, lineHeight);
+            DrawText(g, lines[i].Label, labelFont, TilePalette.Dim, row, StringAlignment.Near);
+            DrawText(g, lines[i].Value, valueFont, lines[i].Color ?? TilePalette.Ink, row, StringAlignment.Far);
+        }
+        if (wide && v.Spark is { Count: > 1 } spark)
+        {
+            var left = pad + listWidth + 22 * k;
+            var sparkRect = new RectangleF(left, top + 18 * k, size.Width - left - pad, size.Height - top - pad - 18 * k);
+            using (var font = fonts.Regular(Math.Max(11f, 11.5f * k)))
+                DrawText(g, v.Detail ?? "", font, TilePalette.Dim, new RectangleF(left, top, sparkRect.Width, 16 * k), StringAlignment.Near);
+            DrawSpark(g, sparkRect, spark, v.SparkColor ?? TilePalette.Preview);
+        }
+    }
+
+    /// <summary>Barra fina de progresso com o tempo à direita (mídia).</summary>
+    private static void DrawProgress(Graphics g, Fonts fonts, TileVisual v, RectangleF row, float k)
+    {
+        using var font = fonts.Semibold(Math.Max(11f, 12.5f * k));
+        var textWidth = string.IsNullOrEmpty(v.ProgressText) ? 0 : g.MeasureString(v.ProgressText, font).Width + 2;
+        if (textWidth > 0)
+            DrawText(g, v.ProgressText!, font, TilePalette.Dim, new RectangleF(row.Right - textWidth, row.Y, textWidth, row.Height), StringAlignment.Far);
+        var barWidth = row.Width - textWidth - (textWidth > 0 ? 8 * k : 0);
+        if (barWidth <= 4)
+            return;
+        var bar = new RectangleF(row.X, row.Y + (row.Height - 5 * k) / 2, barWidth, 5 * k);
+        using (var track = ObsGlyphs.Rounded(bar, bar.Height / 2))
+        using (var brush = new SolidBrush(Color.FromArgb(56, 255, 255, 255)))
+            g.FillPath(brush, track);
+        if (v.Progress is { } progress and > 0)
+        {
+            using var done = ObsGlyphs.Rounded(bar with { Width = Math.Max(bar.Height, (float)(bar.Width * Math.Clamp(progress, 0, 1))) }, bar.Height / 2);
+            using var brush = new SolidBrush(v.Accent ?? TilePalette.Ink);
+            g.FillPath(brush, done);
         }
     }
 

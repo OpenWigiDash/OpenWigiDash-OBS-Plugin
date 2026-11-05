@@ -39,7 +39,8 @@ public sealed record AudioInput(string Name, string Kind)
 public sealed record SceneThumbnail(byte[] Jpeg, DateTimeOffset At);
 
 /// <summary>O que um evento ou resposta mudou e o que falta pedir.</summary>
-internal readonly record struct ObsUpdate(bool Changed, bool NeedsScenes = false, bool NeedsInputs = false, bool NeedsOutputs = false)
+internal readonly record struct ObsUpdate(bool Changed, bool NeedsScenes = false, bool NeedsInputs = false, bool NeedsOutputs = false,
+    string? SceneItemsOf = null, string? FiltersOf = null, string? MediaOf = null, bool NeedsTransition = false)
 {
     public static ObsUpdate None => default;
     public static ObsUpdate Change => new(true);
@@ -49,7 +50,7 @@ internal readonly record struct ObsUpdate(bool Changed, bool NeedsScenes = false
 /// Espelho do OBS que os tiles leem. Só muda pelas respostas e eventos que a <see cref="ObsSession"/> repassa;
 /// cada leitura é uma foto (records imutáveis trocados inteiros).
 /// </summary>
-public sealed class ObsState(TimeProvider time)
+public sealed partial class ObsState(TimeProvider time)
 {
     private readonly Lock _gate = new();
     private Dictionary<string, AudioInput> _inputs = new(StringComparer.Ordinal);
@@ -109,6 +110,7 @@ public sealed class ObsState(TimeProvider time)
             KbpsHistory = [];
             _inputs = new(StringComparer.Ordinal);
             _thumbnails = new(StringComparer.Ordinal);
+            ResetMore();
         }
     }
 
@@ -139,7 +141,8 @@ public sealed class ObsState(TimeProvider time)
         StudioMode = enabled;
         if (!enabled)
             PreviewScene = null;
-        return ObsUpdate.Change;
+        // Ligou: a prévia nem sempre vem em evento; a lista de cenas traz qual é.
+        return new ObsUpdate(true, NeedsScenes: enabled);
     }
 
     /// <summary>GetRecordStatus: outputActive, outputPaused, outputTimecode, outputBytes.</summary>
@@ -270,7 +273,7 @@ public sealed class ObsState(TimeProvider time)
             case "InputCreated" or "InputRemoved" or "InputNameChanged":
                 return new ObsUpdate(true, NeedsInputs: true);
             default:
-                return ObsUpdate.None;
+                return ApplyMoreEvent(type, data);
         }
     }
 

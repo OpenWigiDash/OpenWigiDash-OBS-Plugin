@@ -120,6 +120,15 @@ public abstract class ObsTileInstance : IWidgetInstance
     /// <summary>Toque com o OBS pronto (gestos e press/release).</summary>
     protected abstract Task OnReadyTouchAsync(TouchEvent touch, CancellationToken cancellationToken);
 
+    /// <summary>O widget faz algo com o OBS fora do ar (o Status abre o OBS no long-press).</summary>
+    protected virtual bool OfflineLongPress => false;
+
+    /// <summary>Toque com o OBS fora do ar (só chega se <see cref="OfflineLongPress"/>).</summary>
+    protected virtual Task OnOfflineTouchAsync(TouchEvent touch, CancellationToken cancellationToken) => Task.CompletedTask;
+
+    /// <summary>Texto do tile com o OBS fora do ar (o Status acrescenta "segure para abrir").</summary>
+    protected virtual string OfflineText(ObsConnectionState state, string text) => text;
+
     /// <summary>A tela acordou ou dormiu (ligar e desligar medidor e miniatura).</summary>
     protected virtual void OnAwakeChanged(bool awake)
     {
@@ -147,7 +156,11 @@ public abstract class ObsTileInstance : IWidgetInstance
             _ => ("Conectando…", TilePalette.Preview),
         };
         if (offline is var (text, dot))
-            return new TileVisual(Icon) { Layout = TileLayout.Offline, Detail = text, StatusDot = dot };
+        {
+            var detail = _feedback is { } shown && Now < shown.Until ? shown.Text : OfflineText(Session.ConnectionState, text);
+            var visual0 = new TileVisual(Icon) { Layout = TileLayout.Offline, Detail = detail, StatusDot = dot };
+            return _press is { } held ? visual0 with { Press = held } : visual0;
+        }
 
         var visual = GetVisual();
         if (_feedback is { } feedback && Now < feedback.Until)
@@ -161,9 +174,10 @@ public abstract class ObsTileInstance : IWidgetInstance
 
     public async ValueTask OnTouchAsync(TouchEvent touch, CancellationToken cancellationToken)
     {
-        if (Session.ConnectionState != ObsConnectionState.Ready)
+        var ready = Session.ConnectionState == ObsConnectionState.Ready;
+        if (!ready && !OfflineLongPress)
             return;
-        if (HasLongPress)
+        if (ready ? HasLongPress : OfflineLongPress)
         {
             switch (touch.Kind)
             {
@@ -182,7 +196,10 @@ public abstract class ObsTileInstance : IWidgetInstance
         }
         try
         {
-            await OnReadyTouchAsync(touch, cancellationToken).ConfigureAwait(false);
+            if (ready)
+                await OnReadyTouchAsync(touch, cancellationToken).ConfigureAwait(false);
+            else
+                await OnOfflineTouchAsync(touch, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -228,6 +245,13 @@ public abstract class ObsTileInstance : IWidgetInstance
         return ValueTask.CompletedTask;
     }
 
+    /// <summary>Entrou ou saiu da tela cheia (o painel de cenas muda a grade).</summary>
+    public virtual ValueTask OnFullscreenChangedAsync(bool fullscreen, CancellationToken cancellationToken)
+    {
+        OnAwakeChanged(!_asleep);
+        return ValueTask.CompletedTask;
+    }
+
     public virtual ValueTask DisposeAsync()
     {
         _stop.Cancel();
@@ -266,10 +290,12 @@ public abstract class ObsTileInstance : IWidgetInstance
             var feedbackShown = false;
             while (await timer.WaitForNextTickAsync(token).ConfigureAwait(false))
             {
-                if (_asleep || Session.ConnectionState != ObsConnectionState.Ready)
+                if (_asleep)
                     continue;
                 var feedback = _feedback is { } f && Now < f.Until;
-                if (Animating || feedback || feedbackShown)
+                if (Session.ConnectionState != ObsConnectionState.Ready && !feedback && !feedbackShown)
+                    continue;
+                if ((Animating && Session.ConnectionState == ObsConnectionState.Ready) || feedback || feedbackShown)
                     Context.RequestRender();
                 feedbackShown = feedback;
             }

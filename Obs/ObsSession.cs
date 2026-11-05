@@ -36,7 +36,7 @@ public enum ObsConnectionState
 /// <item>OBS fechou: tenta de novo cada vez mais espaçado (até 30 s). Senha errada: espera a pessoa mudar.</item>
 /// </list>
 /// </remarks>
-public sealed class ObsSession : IAsyncDisposable
+public sealed partial class ObsSession : IAsyncDisposable
 {
     private static readonly TimeSpan[] DefaultBackoff =
         [TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(30)];
@@ -88,6 +88,12 @@ public sealed class ObsSession : IAsyncDisposable
 
     /// <summary>Endereço da tentativa atual (sem a senha).</summary>
     public string? Address { get; private set; }
+
+    /// <summary>Endereço da tentativa atual (sem a senha fora daqui: só para saber se o OBS é deste PC).</summary>
+    internal ObsEndpoint? Endpoint { get; private set; }
+
+    /// <summary>O OBS configurado roda neste PC (dá para abrir ele daqui).</summary>
+    public bool IsLocal => Endpoint?.IsLocal ?? true;
 
     /// <summary>Algo que os tiles mostram mudou. Chamado fora do laço de rede.</summary>
     public event Action? Changed;
@@ -252,6 +258,7 @@ public sealed class ObsSession : IAsyncDisposable
             _attempt = attempt;
             var endpoint = _endpoint();
             Address = $"{endpoint.Host}:{endpoint.Port}";
+            Endpoint = endpoint;
             var result = await ConnectOnceAsync(endpoint, attempt.Token).ConfigureAwait(false);
             _attempt = null;
             if (stop.IsCancellationRequested)
@@ -336,6 +343,7 @@ public sealed class ObsSession : IAsyncDisposable
         var sync = SyncAllAsync(session.Token);
         var status = StatusLoopAsync(session.Token);
         var thumbnails = ThumbnailLoopAsync(session.Token);
+        var polls = PollLoopAsync(session.Token);
         try
         {
             await receiver.ConfigureAwait(false);
@@ -343,7 +351,7 @@ public sealed class ObsSession : IAsyncDisposable
         finally
         {
             session.Cancel();
-            await Task.WhenAll(sync, status, thumbnails).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+            await Task.WhenAll(sync, status, thumbnails, polls).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
         }
         if (socket.CloseStatus is { } close)
             _log.Write($"OBS fechou a conexão ({(int)close} {socket.CloseStatusDescription}).");
@@ -437,6 +445,7 @@ public sealed class ObsSession : IAsyncDisposable
             _ = SyncScenesAsync(CancellationToken.None);
         if (update.NeedsInputs)
             _ = SyncInputsAsync(CancellationToken.None);
+        SyncMore(update);
         if (update.NeedsOutputs)
             _ = SyncOutputsAsync(CancellationToken.None);
         if (!update.Changed)
@@ -469,6 +478,7 @@ public sealed class ObsSession : IAsyncDisposable
         if (vcam.Ok)
             State.ApplyVirtualCam(vcam.Data);
         await SyncInputsAsync(token).ConfigureAwait(false);
+        await SyncMoreAsync(token).ConfigureAwait(false);
         RaiseChanged();
     }
 
@@ -497,6 +507,8 @@ public sealed class ObsSession : IAsyncDisposable
         var list = await RequestAsync("GetInputList", null, token).ConfigureAwait(false);
         if (!list.Ok)
             return;
+        if (State.ApplyInputList(list.Data).Changed)
+            RaiseChanged();
         var audio = new List<AudioInput>();
         foreach (var item in ObsProtocol.Arr(list.Data, "inputs").EnumerateArrayOrEmpty())
         {

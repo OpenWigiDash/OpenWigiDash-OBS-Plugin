@@ -1,0 +1,31 @@
+@* Opções do widget Fonte visível. *@
+<MudStack Spacing="3">
+    <MudSelect T="string" Value="@Instance.Scene" ValueChanged="v => Instance.SetSceneAsync(v)" Label="Cena"
+               Variant="Variant.Outlined" Style="min-width:280px">
+        @foreach (var scene in Instance.AvailableScenes)
+        {
+            <MudSelectItem Value="@scene">@scene</MudSelectItem>
+        }
+        @if (Instance.Scene is { } chosen && !Instance.AvailableScenes.Contains(chosen))
+        {
+            <MudSelectItem Value="@chosen">@($"{chosen} · não existe agora")</MudSelectItem>
+        }
+    </MudSelect>
+    <MudSelect T="string" Value="@Instance.Source" ValueChanged="v => Instance.SetSourceAsync(v)" Label="Fonte"
+               Variant="Variant.Outlined" Disabled="@(Instance.Scene is null)"
+               HelperText="Toque mostra e esconde. Segure para inverter só enquanto segura.">
+        @foreach (var item in Instance.AvailableSources)
+        {
+            <MudSelectItem Value="@item.SourceName">@item.SourceName</MudSelectItem>
+        }
+        @if (Instance.Source is { } source && Instance.AvailableSources.All(i => i.SourceName != source))
+        {
+            <MudSelectItem Value="@source">@($"{source} · não está na cena agora")</MudSelectItem>
+        }
+    </MudSelect>
+</MudStack>
+
+@code {
+    [Parameter, EditorRequired]
+    public SourceVisibilityInstance Instance { get; set; } = default!;
+}

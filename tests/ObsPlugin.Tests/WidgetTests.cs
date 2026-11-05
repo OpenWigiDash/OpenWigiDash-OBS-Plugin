@@ -320,7 +320,8 @@ public sealed class TileTests : IAsyncLifetime
     [Fact]
     public async Task Manifests_AreUnique()
     {
-        ObsWidgetBase[] widgets = [new RecordWidget(), new StreamWidget(), new SceneWidget(), new MixerWidget(), new ReplayBufferWidget(), new VirtualCamWidget()];
+        ObsWidgetBase[] widgets = [new RecordWidget(), new StreamWidget(), new SceneWidget(), new MixerWidget(), new ReplayBufferWidget(), new VirtualCamWidget(),
+            new ScenePanelWidget(), new StatusWidget(), new SourceVisibilityWidget(), new FilterWidget(), new StudioModeWidget(), new TransitionWidget(), new MediaWidget()];
         Assert.Equal(widgets.Length, widgets.Select(w => w.Manifest.Id).Distinct().Count());
         Assert.All(widgets, w => Assert.StartsWith("OBS: ", w.Manifest.Name));
         await Task.CompletedTask;

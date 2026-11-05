@@ -16,6 +16,16 @@ public enum ObsIcon
     Pause,
     Play,
     Check,
+    Eye,
+    Filter,
+    Studio,
+    Transition,
+    Stats,
+    Monitor,
+    Globe,
+    Text,
+    Image,
+    Grid,
 }
 
 /// <summary>Desenha um <see cref="ObsIcon"/> dentro de uma caixa quadrada, no traço dos protótipos (1,8 de 24).</summary>
@@ -88,6 +98,67 @@ internal static class ObsGlyphs
                 break;
             case ObsIcon.Check:
                 g.DrawLines(pen, [P(5, 12.5f), P(9.5f, 17), P(19, 7.5f)]);
+                break;
+            case ObsIcon.Eye:
+                using (var lens = new GraphicsPath())
+                {
+                    lens.AddBezier(P(2.5f, 12), P(6, 5.5f), P(18, 5.5f), P(21.5f, 12));
+                    lens.AddBezier(P(21.5f, 12), P(18, 18.5f), P(6, 18.5f), P(2.5f, 12));
+                    lens.CloseFigure();
+                    g.DrawPath(pen, lens);
+                }
+                g.DrawEllipse(pen, Circle(12, 12, 3.2f));
+                break;
+            case ObsIcon.Filter:
+                g.DrawPolygon(pen, [P(4, 5), P(20, 5), P(14, 12.5f), P(14, 19), P(10, 17), P(10, 12.5f)]);
+                break;
+            case ObsIcon.Studio:
+                using (var left = Rounded(R(2.5f, 7, 8.5f, 7), 1.5f * s))
+                    g.DrawPath(pen, left);
+                using (var right = Rounded(R(13, 7, 8.5f, 7), 1.5f * s))
+                    g.DrawPath(pen, right);
+                g.DrawLine(pen, P(8, 18), P(16, 18));
+                break;
+            case ObsIcon.Transition:
+                using (var from = Rounded(R(3, 6, 9, 12), 1.5f * s))
+                    g.DrawPath(pen, from);
+                g.DrawLine(pen, P(14, 12), P(21, 12));
+                g.DrawLines(pen, [P(18, 8.8f), P(21, 12), P(18, 15.2f)]);
+                break;
+            case ObsIcon.Stats:
+                g.DrawArc(pen, Circle(12, 14, 8.5f), 180, 180);
+                g.DrawLine(pen, P(12, 14), P(16.5f, 8.5f));
+                g.FillEllipse(fill, Circle(12, 14, 1.6f));
+                g.DrawLine(pen, P(3.5f, 19), P(20.5f, 19));
+                break;
+            case ObsIcon.Monitor:
+                using (var screen = Rounded(R(3, 4.5f, 18, 12), 1.8f * s))
+                    g.DrawPath(pen, screen);
+                g.DrawLine(pen, P(12, 16.5f), P(12, 20));
+                g.DrawLine(pen, P(8, 20), P(16, 20));
+                break;
+            case ObsIcon.Globe:
+                g.DrawEllipse(pen, Circle(12, 12, 8.5f));
+                g.DrawEllipse(pen, R(8.2f, 3.5f, 7.6f, 17));
+                g.DrawLine(pen, P(3.5f, 12), P(20.5f, 12));
+                break;
+            case ObsIcon.Text:
+                g.DrawLine(pen, P(5, 5.5f), P(19, 5.5f));
+                g.DrawLine(pen, P(12, 5.5f), P(12, 19));
+                g.DrawLine(pen, P(9, 19), P(15, 19));
+                break;
+            case ObsIcon.Image:
+                using (var photo = Rounded(R(3, 4.5f, 18, 15), 2 * s))
+                    g.DrawPath(pen, photo);
+                g.DrawEllipse(pen, Circle(9, 9.5f, 1.8f));
+                g.DrawLines(pen, [P(3.5f, 17.5f), P(10, 12.5f), P(14, 15.5f), P(16.5f, 13.5f), P(20.5f, 17)]);
+                break;
+            case ObsIcon.Grid:
+                foreach (var (x, y) in new[] { (3.5f, 4f), (13f, 4f), (3.5f, 13.5f), (13f, 13.5f) })
+                {
+                    using var cell = Rounded(R(x, y, 7.5f, 6.5f), 1.5f * s);
+                    g.DrawPath(pen, cell);
+                }
                 break;
         }
 
