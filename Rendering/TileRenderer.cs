@@ -29,7 +29,11 @@ public static class TileRenderer
             var background = visual.Accent is { } accent && visual.Tinted && visual.Layout != TileLayout.Offline
                 ? TilePalette.Tint(accent, visual.Layout == TileLayout.Standard && visual.Ring is null ? 0.24 : 0.18)
                 : TilePalette.Background;
-            g.Clear(visual.Layout == TileLayout.Offline ? Color.Black : background);
+            var clear = visual.Layout == TileLayout.Offline ? Color.Black : background;
+            g.Clear(clear);
+            // O símbolo do OBS grande no canto, um tom acima do fundo, como o do Discord: marca o tile como do OBS
+            // sem brigar com a informação. Acompanha a cor do estado porque sai do próprio fundo.
+            DrawLogo(g, size, TilePalette.Blend(clear, Color.White, visual.Layout == TileLayout.Offline ? 0.05 : 0.075));
 
             var mini = size.Height < 100;
             var wide = size.Width >= size.Height * 2.2f;
@@ -40,6 +44,9 @@ public static class TileRenderer
                     break;
                 case TileLayout.Grid:
                     DrawGrid(g, size, fonts, visual);
+                    break;
+                case TileLayout.Catalog:
+                    DrawCatalog(g, size, fonts, visual, background);
                     break;
                 case TileLayout.Stats when !mini:
                     DrawStats(g, size, fonts, visual, background, wide);
@@ -78,6 +85,25 @@ public static class TileRenderer
     }
 
     // ---- layouts ----
+
+    /// <summary>Ícone do catálogo: ícone no meio e nome curto embaixo, nas mesmas proporções do Discord.</summary>
+    private static void DrawCatalog(Graphics g, PixelSize size, Fonts fonts, TileVisual v, Color background)
+    {
+        var compact = size.Height < 100;
+        var labelHeight = compact ? Math.Max(12, size.Height / 5f) : Math.Max(16, size.Height / 7f);
+        var hasLabel = !string.IsNullOrEmpty(v.Big);
+        var textBlock = hasLabel ? labelHeight + (compact ? 4 : 8) : 0;
+        var top = compact ? 3f : 6f;
+        var iconArea = new RectangleF(0, top, size.Width, size.Height - textBlock - top);
+        var side = Math.Min(iconArea.Height * 0.62f, size.Width * 0.4f);
+        ObsGlyphs.Draw(g, v.Icon, new RectangleF((size.Width - side) / 2, iconArea.Y + (iconArea.Height - side) / 2, side, side),
+            TilePalette.Ink, background: background);
+        if (hasLabel)
+        {
+            using var font = fonts.Semibold(labelHeight * 0.8f);
+            DrawText(g, v.Big!, font, TilePalette.Ink, new RectangleF(4, size.Height - textBlock, size.Width - 8, labelHeight + 2), StringAlignment.Center);
+        }
+    }
 
     private static void DrawMini(Graphics g, PixelSize size, Fonts fonts, TileVisual v, Color background)
     {
@@ -374,6 +400,39 @@ public static class TileRenderer
     }
 
     // ---- peças ----
+
+    private static readonly Lazy<Bitmap> LogoMask = new(LoadLogoMask);
+
+    /// <summary>Símbolo do OBS (branco sobre preto, 512 px) como máscara: o brilho vira transparência.</summary>
+    private static Bitmap LoadLogoMask()
+    {
+        using var stream = typeof(TileRenderer).Assembly.GetManifestResourceStream("OpenWigiDash.ObsPlugin.Rendering.obs-logo-mask.png")!;
+        using var source = new Bitmap(stream);
+        var mask = new Bitmap(source.Width, source.Height, PixelFormat.Format32bppArgb);
+        for (var y = 0; y < source.Height; y++)
+            for (var x = 0; x < source.Width; x++)
+                mask.SetPixel(x, y, Color.FromArgb(source.GetPixel(x, y).R, 255, 255, 255));
+        return mask;
+    }
+
+    /// <summary>O símbolo grande no canto inferior direito, saindo do tile, na cor <paramref name="color"/>.</summary>
+    private static void DrawLogo(Graphics g, PixelSize size, Color color)
+    {
+        var side = size.Height * 1.25f;
+        var rect = new RectangleF(size.Width - side * 0.64f, size.Height - side * 0.7f, side, side);
+        var mask = LogoMask.Value;
+        using var attributes = new ImageAttributes();
+        attributes.SetColorMatrix(new ColorMatrix(
+        [
+            [0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0],
+            [0, 0, 0, 1, 0],
+            [color.R / 255f, color.G / 255f, color.B / 255f, 0, 1],
+        ]));
+        lock (mask)
+            g.DrawImage(mask, Rectangle.Round(rect), 0, 0, mask.Width, mask.Height, GraphicsUnit.Pixel, attributes);
+    }
 
     private static void DrawCaption(Graphics g, Fonts fonts, TileVisual v, RectangleF rect, float k)
     {

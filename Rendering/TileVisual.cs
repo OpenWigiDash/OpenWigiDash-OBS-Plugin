@@ -17,6 +17,11 @@ public enum TileLayout
     Grid,
     /// <summary>Linhas de rótulo e valor (status do OBS), com minigráfico no Wide.</summary>
     Stats,
+    /// <summary>
+    /// Ícone do catálogo: o ícone grande no meio e o nome curto (<see cref="TileVisual.Big"/>) embaixo, igual em
+    /// todos os widgets e tamanhos, como no plugin do Discord.
+    /// </summary>
+    Catalog,
 }
 
 /// <summary>Uma célula do painel: o texto e a cor (programa), o anel (prévia) ou "mais" (próxima página).</summary>

@@ -18,6 +18,8 @@ public sealed class ScenePanelWidget : ObsWidgetBase
         "Todas as cenas numa grade: toque troca (no modo estúdio, para a prévia), segure manda direto para o ar. Arraste para cima para a tela cheia.",
         WidgetSize.Large) with { SupportsFullscreen = true };
 
+    protected override string CatalogLabel => "Cenas";
+
     protected override TileVisual Preview => ScenePanelInstance.Visual(
         ["Começando", "Câmera", "Jogo", "Conversa", "Intervalo", "Encerramento"], "Jogo", "Câmera", studio: true,
         new PixelSize(400, 290), page: 0);

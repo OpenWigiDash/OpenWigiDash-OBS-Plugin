@@ -25,6 +25,18 @@ public abstract class ObsWidgetBase : IWidget
     /// <summary>A prévia do catálogo, para os testes.</summary>
     internal TileVisual PreviewVisual => Preview;
 
+    /// <summary>Nome curto embaixo do ícone do catálogo. Padrão: o nome sem o "OBS: ".</summary>
+    protected virtual string CatalogLabel => Manifest.Name.StartsWith("OBS: ", StringComparison.Ordinal) ? Manifest.Name[5..] : Manifest.Name;
+
+    /// <summary>Ícone do catálogo. Padrão: o da prévia.</summary>
+    protected virtual ObsIcon CatalogIcon => Preview.Icon;
+
+    /// <summary>
+    /// O que o catálogo mostra: em todos os tamanhos, o ícone do widget e o nome curto sobre o fundo com o símbolo
+    /// do OBS. Assim todos os ícones seguem o mesmo padrão, em vez de alguns virarem miniatura do tile.
+    /// </summary>
+    internal TileVisual CatalogVisual => new(CatalogIcon) { Layout = TileLayout.Catalog, Big = CatalogLabel };
+
     protected abstract ObsTileInstance CreateInstance(IWidgetContext context);
 
     public ValueTask LoadAsync(IWidgetHost host, CancellationToken cancellationToken)
@@ -43,7 +55,7 @@ public abstract class ObsWidgetBase : IWidget
     }
 
     public ValueTask<WidgetFrame?> GetPreviewAsync(WidgetSize size, PixelSize pixelSize, CancellationToken cancellationToken) =>
-        ValueTask.FromResult<WidgetFrame?>(TileRenderer.Render(pixelSize, _host?.Theme ?? new WidgetTheme(), Preview));
+        ValueTask.FromResult<WidgetFrame?>(TileRenderer.Render(pixelSize, _host?.Theme ?? new WidgetTheme(), CatalogVisual));
 
     protected static WidgetManifest CreateManifest(Guid id, string name, string description, params WidgetSize[] sizes) => new()
     {

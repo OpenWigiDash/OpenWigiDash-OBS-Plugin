@@ -19,6 +19,8 @@ public sealed class MixerWidget : ObsWidgetBase
         "Muta uma fonte de áudio do OBS (ou push to talk / push to mute), com medidor ao vivo. No Wide, as bordas ajustam o volume.",
         WidgetSize.Mini, WidgetSize.Small, WidgetSize.Wide);
 
+    protected override string CatalogLabel => "Mixer";
+
     protected override TileVisual Preview => MixerInstance.Visual(new AudioInput("Microfone", "wasapi_input_capture") { VolumeDb = -6, Level = 0.62 },
         MixerMode.Toggle, wide: false, mini: false);
 

@@ -19,6 +19,9 @@ public sealed class SourceVisibilityWidget : ObsWidgetBase
         "Toque mostra e esconde uma fonte da cena; segure para inverter só enquanto segura.",
         WidgetSize.Mini, WidgetSize.Small);
 
+    // A prévia usa o ícone da webcam de exemplo; no catálogo, o olho diz o que o widget faz.
+    protected override ObsIcon CatalogIcon => ObsIcon.Eye;
+
     protected override TileVisual Preview => SourceVisibilityInstance.Visual(
         new SceneItem(1, "Webcam", "dshow_input", true, false), "Jogo", mini: false);
 
