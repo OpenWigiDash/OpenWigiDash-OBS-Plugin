@@ -13,7 +13,17 @@ public enum TileLayout
     Thumbnail,
     /// <summary>OBS ainda não pronto: ícone apagado, um ponto de estado e o motivo.</summary>
     Offline,
+    /// <summary>Grade de botões (painel de cenas): <see cref="TileVisual.Cells"/> em <see cref="GridLayout"/>.</summary>
+    Grid,
+    /// <summary>Linhas de rótulo e valor (status do OBS), com minigráfico no Wide.</summary>
+    Stats,
 }
+
+/// <summary>Uma célula do painel: o texto e a cor (programa), o anel (prévia) ou "mais" (próxima página).</summary>
+public sealed record GridCell(string Text, Color? Fill = null, Color? Ring = null, bool More = false);
+
+/// <summary>Uma linha do status: rótulo apagado à esquerda, valor à direita (com cor se estiver ruim).</summary>
+public sealed record StatLine(string Label, string Value, Color? Color = null);
 
 /// <summary>
 /// O que um tile do OBS mostra, sem desenho. As instâncias montam isto a partir do <c>ObsState</c>; o
@@ -78,6 +88,17 @@ public sealed record TileVisual(ObsIcon Icon)
 
     /// <summary>Barra branca embaixo enchendo durante o long-press (0..1).</summary>
     public double? Press { get; init; }
+
+    /// <summary>Barra de progresso embaixo (mídia), de 0 a 1, com <see cref="ProgressText"/> à direita.</summary>
+    public double? Progress { get; init; }
+
+    public string? ProgressText { get; init; }
+
+    /// <summary>Células do layout <see cref="TileLayout.Grid"/>, na ordem de leitura.</summary>
+    public IReadOnlyList<GridCell>? Cells { get; init; }
+
+    /// <summary>Linhas do layout <see cref="TileLayout.Stats"/>.</summary>
+    public IReadOnlyList<StatLine>? Lines { get; init; }
 }
 
 /// <summary>Cores dos tiles, iguais aos protótipos aprovados. O fundo é sempre grafite: a tela é escura.</summary>

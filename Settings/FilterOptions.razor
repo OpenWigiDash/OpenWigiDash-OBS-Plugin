@@ -1,0 +1,31 @@
+@* Opções do widget Filtro. *@
+<MudStack Spacing="3">
+    <MudSelect T="string" Value="@Instance.Source" ValueChanged="v => Instance.SetSourceAsync(v)" Label="Fonte ou cena"
+               Variant="Variant.Outlined" Style="min-width:280px">
+        @foreach (var source in Instance.AvailableSources)
+        {
+            <MudSelectItem Value="@source">@source</MudSelectItem>
+        }
+        @if (Instance.Source is { } chosen && !Instance.AvailableSources.Contains(chosen))
+        {
+            <MudSelectItem Value="@chosen">@($"{chosen} · não existe agora")</MudSelectItem>
+        }
+    </MudSelect>
+    <MudSelect T="string" Value="@Instance.Filter" ValueChanged="v => Instance.SetFilterAsync(v)" Label="Filtro"
+               Variant="Variant.Outlined" Disabled="@(Instance.Source is null)"
+               HelperText="Toque liga e desliga. Segure para inverter só enquanto segura.">
+        @foreach (var filter in Instance.AvailableFilters)
+        {
+            <MudSelectItem Value="@filter.Name">@filter.Name</MudSelectItem>
+        }
+        @if (Instance.Filter is { } current && Instance.AvailableFilters.All(f => f.Name != current))
+        {
+            <MudSelectItem Value="@current">@($"{current} · não existe agora")</MudSelectItem>
+        }
+    </MudSelect>
+</MudStack>
+
+@code {
+    [Parameter, EditorRequired]
+    public FilterInstance Instance { get; set; } = default!;
+}

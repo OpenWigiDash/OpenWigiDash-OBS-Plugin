@@ -11,7 +11,7 @@
     <EnableDynamicLoading>true</EnableDynamicLoading>
     <Authors>Victor Perez</Authors>
     <Product>OBS Studio</Product>
-    <Description>Controle do OBS Studio no WigiDash (OpenWigiDashManager): gravar, live, cenas, mixer de áudio, replay buffer e câmera virtual, com tempo, nível de áudio e miniatura da cena no tile.</Description>
+    <Description>Controle do OBS Studio no WigiDash (OpenWigiDashManager): gravar, live, cenas e painel de cenas, mixer de áudio, replay buffer, câmera virtual, fontes, filtros, mídia, modo estúdio, transição e status, com tempo, nível de áudio e miniatura da cena no tile.</Description>
   </PropertyGroup>
 
   <!-- `dotnet pack` gera o pacote de plugin para o nuget.org (docs/sdk.md do OpenWigiDashManager,

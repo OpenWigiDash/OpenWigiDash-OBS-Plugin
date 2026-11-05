@@ -21,7 +21,7 @@ public sealed class RecordWidget : ObsWidgetBase
         "Toque grava ou para; segure para pausar. Mostra o tempo de gravação.",
         WidgetSize.Mini, WidgetSize.Small, WidgetSize.Wide);
 
-    protected override TileVisual Preview => RecordInstance.Visual(new OutputStatus { Active = true, Timecode = TimeSpan.FromSeconds(727) },
+    protected override TileVisual Preview => RecordInstance.Visual(new OutputStatus { Active = true, Timecode = TimeSpan.FromSeconds(727), ObservedAt = DateTimeOffset.UnixEpoch },
         DateTimeOffset.UnixEpoch, mini: false, wide: false, RecordLongPress.Pause) with { PulseDim = false };
 
     protected override ObsTileInstance CreateInstance(IWidgetContext context) => new RecordInstance(context);
@@ -115,7 +115,7 @@ public sealed class StreamWidget : ObsWidgetBase
         WidgetSize.Mini, WidgetSize.Small, WidgetSize.Wide);
 
     protected override TileVisual Preview => StreamInstance.Visual(
-        new OutputStatus { Active = true, Timecode = TimeSpan.FromSeconds(3753), Kbps = 6000, TotalFrames = 1000 },
+        new OutputStatus { Active = true, Timecode = TimeSpan.FromSeconds(3753), ObservedAt = DateTimeOffset.UnixEpoch, Kbps = 6000, TotalFrames = 1000 },
         [5800, 5950, 6100, 6000, 5900, 6050, 6000], DateTimeOffset.UnixEpoch, wide: true);
 
     protected override ObsTileInstance CreateInstance(IWidgetContext context) => new StreamInstance(context);

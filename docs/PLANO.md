@@ -17,17 +17,26 @@ Plano aprovado: <https://claude.ai/artifact/LaKXkHGSTVDk6iK9yXx6T9>. Protótipos
   pausar/capítulo na gravação, mandar a cena direto para o ar, inverter o mudo enquanto segura.
 - **Ícones** próprios em vetor (o SDK não tem live, replay nem cena).
 
-## Fase 1 (este PR)
+## Fase 1 (PR #1, no main)
 
 Gravar, Live, Cena (com miniatura), Mixer de áudio, Replay buffer, Câmera virtual.
 
-## Fase 2
+## Fase 2 (PR #2)
 
-- Fonte: mostrar e esconder um item da cena (segurar = mostrar só enquanto segura).
+- Painel de cenas: todas as cenas numa grade no Large, com tela cheia e páginas.
+- Status do OBS: CPU, FPS, quadros perdidos de render e de codificação (segurar = abrir o OBS, se estiver fechado
+  neste PC).
+- Fonte visível: mostrar e esconder um item da cena (segurar = só enquanto segura).
 - Filtro: ligar e desligar um filtro (segurar = só enquanto segura).
-- Transição do modo estúdio (Cortar/Transição) e troca de coleção de cenas.
-- Mídia: play/pause e tempo restante (segurar = reiniciar).
-- Status do OBS: CPU, FPS, quadros perdidos de render e de codificação (segurar = abrir o OBS).
+- Modo estúdio e Transição (manda a prévia para o ar).
+- Mídia: play/pause, progresso e tempo restante (segurar = reiniciar).
+
+Itens de cena, filtros e mídia só são lidos para quem tem um tile acordado olhando para eles. As estatísticas são lidas
+a cada segundo só com um Status acordado; o cursor da mídia anda sozinho no tile e é acertado a cada 2 s.
+
+## Fase 3
+
+- Troca de coleção de cenas.
 - Hotkeys do OBS por nome.
 
 ## Falta testar no aparelho

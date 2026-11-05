@@ -42,6 +42,26 @@ internal sealed class FakeObs : IAsyncDisposable
     public bool VirtualCam { get; set; }
     public Dictionary<string, (bool Muted, double Db)> Audio { get; } = new() { ["Microfone"] = (false, -6), ["Áudio do PC"] = (true, 0) };
 
+    /// <summary>Itens por cena, de cima para baixo (como o OBS mostra).</summary>
+    public Dictionary<string, List<(int Id, string Name, string Kind, bool Enabled)>> Items { get; } = new()
+    {
+        ["Jogo"] = [(2, "Webcam", "dshow_input", true), (1, "Captura do jogo", "game_capture", true)],
+        ["Câmera"] = [(1, "Webcam", "dshow_input", true)],
+    };
+
+    public Dictionary<string, List<(string Name, string Kind, bool Enabled)>> SourceFilters { get; } = new()
+    {
+        ["Webcam"] = [("Correção de cor", "color_filter_v2", false), ("Chroma key", "chroma_key_filter_v2", true)],
+    };
+
+    public Dictionary<string, (string State, double Duration, double Cursor)> MediaInputs { get; } = new()
+    {
+        ["Vinheta"] = ("OBS_MEDIA_STATE_STOPPED", 30_000, 0),
+    };
+
+    public double Cpu { get; set; } = 4.5;
+    public string TransitionName { get; set; } = "Fade";
+
     /// <summary>Pedidos que o OBS recusa (ex.: CreateRecordChapter fora do Hybrid MP4).</summary>
     public HashSet<string> Refuse { get; } = [];
 
@@ -200,7 +220,8 @@ internal sealed class FakeObs : IAsyncDisposable
                             ["inputs"] = new JsonArray(
                                 new JsonObject { ["inputName"] = "Microfone", ["unversionedInputKind"] = "wasapi_input_capture" },
                                 new JsonObject { ["inputName"] = "Áudio do PC", ["unversionedInputKind"] = "wasapi_output_capture" },
-                                new JsonObject { ["inputName"] = "Webcam", ["unversionedInputKind"] = "dshow_input" }),
+                                new JsonObject { ["inputName"] = "Webcam", ["unversionedInputKind"] = "dshow_input" },
+                                new JsonObject { ["inputName"] = "Vinheta", ["unversionedInputKind"] = "ffmpeg_source" }),
                         };
                         break;
                     case "GetInputMute" when Audio.TryGetValue((string)data!["inputName"]!, out var a):
@@ -252,6 +273,90 @@ internal sealed class FakeObs : IAsyncDisposable
                     case "StopStream":
                         Streaming = false;
                         events.Add(("StreamStateChanged", Output(false)));
+                        break;
+                    case "GetSceneItemList" when Items.TryGetValue((string)data!["sceneName"]!, out var items):
+                        response = new JsonObject
+                        {
+                            ["sceneItems"] = new JsonArray([.. items.Select((it, i) => (JsonNode)new JsonObject
+                            {
+                                ["sceneItemId"] = it.Id, ["sourceName"] = it.Name, ["inputKind"] = it.Kind,
+                                ["sceneItemEnabled"] = it.Enabled, ["isGroup"] = false, ["sceneItemIndex"] = items.Count - 1 - i,
+                            })]),
+                        };
+                        break;
+                    case "SetSceneItemEnabled":
+                    {
+                        var scene = (string)data!["sceneName"]!;
+                        var itemId = (int)data["sceneItemId"]!;
+                        var enabled = (bool)data["sceneItemEnabled"]!;
+                        var list = Items[scene];
+                        var at = list.FindIndex(i => i.Id == itemId);
+                        list[at] = list[at] with { Enabled = enabled };
+                        events.Add(("SceneItemEnableStateChanged", new JsonObject { ["sceneName"] = scene, ["sceneItemId"] = itemId, ["sceneItemEnabled"] = enabled }));
+                        break;
+                    }
+                    case "GetSourceFilterList":
+                        response = new JsonObject
+                        {
+                            ["filters"] = new JsonArray([.. SourceFilters.GetValueOrDefault((string)data!["sourceName"]!, []).Select((f, i) => (JsonNode)new JsonObject
+                            {
+                                ["filterName"] = f.Name, ["filterKind"] = f.Kind, ["filterEnabled"] = f.Enabled, ["filterIndex"] = i,
+                            })]),
+                        };
+                        break;
+                    case "SetSourceFilterEnabled":
+                    {
+                        var source = (string)data!["sourceName"]!;
+                        var name = (string)data["filterName"]!;
+                        var enabled = (bool)data["filterEnabled"]!;
+                        var list = SourceFilters[source];
+                        var at = list.FindIndex(f => f.Name == name);
+                        list[at] = list[at] with { Enabled = enabled };
+                        events.Add(("SourceFilterEnableStateChanged", new JsonObject { ["sourceName"] = source, ["filterName"] = name, ["filterEnabled"] = enabled }));
+                        break;
+                    }
+                    case "GetMediaInputStatus" when MediaInputs.TryGetValue((string)data!["inputName"]!, out var media):
+                        response = new JsonObject { ["mediaState"] = media.State, ["mediaDuration"] = media.Duration, ["mediaCursor"] = media.Cursor };
+                        break;
+                    case "TriggerMediaInputAction":
+                    {
+                        var name = (string)data!["inputName"]!;
+                        var action = (string)data["mediaAction"]!;
+                        var media = MediaInputs[name];
+                        MediaInputs[name] = action switch
+                        {
+                            "OBS_WEBSOCKET_MEDIA_INPUT_ACTION_PLAY" => media with { State = "OBS_MEDIA_STATE_PLAYING" },
+                            "OBS_WEBSOCKET_MEDIA_INPUT_ACTION_PAUSE" => media with { State = "OBS_MEDIA_STATE_PAUSED" },
+                            "OBS_WEBSOCKET_MEDIA_INPUT_ACTION_STOP" => media with { State = "OBS_MEDIA_STATE_STOPPED", Cursor = 0 },
+                            _ => media with { State = "OBS_MEDIA_STATE_PLAYING", Cursor = 0 },
+                        };
+                        events.Add(("MediaInputActionTriggered", new JsonObject { ["inputName"] = name, ["mediaAction"] = action }));
+                        break;
+                    }
+                    case "GetStats":
+                        response = new JsonObject
+                        {
+                            ["cpuUsage"] = Cpu, ["memoryUsage"] = 512.0, ["activeFps"] = 60.0, ["averageFrameRenderTime"] = 3.2,
+                            ["renderSkippedFrames"] = 30, ["renderTotalFrames"] = 1000, ["outputSkippedFrames"] = 0, ["outputTotalFrames"] = 1000,
+                        };
+                        break;
+                    case "GetCurrentSceneTransition":
+                        response = new JsonObject { ["transitionName"] = TransitionName, ["transitionDuration"] = 300 };
+                        break;
+                    case "SetStudioModeEnabled":
+                        StudioMode = (bool)data!["studioModeEnabled"]!;
+                        events.Add(("StudioModeStateChanged", new JsonObject { ["studioModeEnabled"] = StudioMode }));
+                        break;
+                    case "TriggerStudioModeTransition" when !StudioMode:
+                        ok = false;
+                        code = 506; // StudioModeNotActive
+                        break;
+                    case "TriggerStudioModeTransition":
+                        (Program, Preview) = (Preview, Program);
+                        events.Add(("SceneTransitionStarted", new JsonObject { ["transitionName"] = TransitionName }));
+                        events.Add(("CurrentProgramSceneChanged", new JsonObject { ["sceneName"] = Program }));
+                        events.Add(("CurrentPreviewSceneChanged", new JsonObject { ["sceneName"] = Preview }));
+                        events.Add(("SceneTransitionEnded", new JsonObject { ["transitionName"] = TransitionName }));
                         break;
                     case "GetSourceScreenshot":
                         response = new JsonObject { ["imageData"] = "data:image/jpg;base64," + Convert.ToBase64String([0xFF, 0xD8, 0xFF, 0xD9]) };
