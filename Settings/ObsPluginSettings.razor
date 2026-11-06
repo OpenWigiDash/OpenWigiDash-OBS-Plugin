@@ -1,0 +1,20 @@
+@inherits PluginSettingsComponent
+@implements IDisposable
+
+@* Página do plugin no manager (Loja > OBS > Configurar): endereço e senha do obs-websocket, uma vez só para todos os
+   widgets do OBS. Enquanto a página está aberta ela segura a sessão, para mostrar o estado e testar a conexão mesmo
+   sem nenhum widget do OBS no layout. *@
+<ConnectionPanel Session="_session" />
+
+@code {
+    private readonly ObsSession _session = ObsTileInstance.SessionOverride ?? ObsSession.Shared;
+    private IDisposable? _lease;
+
+    protected override void OnInitialized()
+    {
+        _session.UseLogger(Host.LoggerFactory);
+        _lease = _session.Acquire();
+    }
+
+    public void Dispose() => _lease?.Dispose();
+}

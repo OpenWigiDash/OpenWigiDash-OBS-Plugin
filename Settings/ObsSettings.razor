@@ -1,9 +1,37 @@
 @inherits WidgetSettingsComponent<ObsTileInstance>
 @implements IDisposable
 
-@* Configurações de qualquer widget do OBS: a conexão (igual para todos) e as opções do widget, se ele tiver. *@
+@* Configurações de qualquer widget do OBS. A conexão é do plugin inteiro e fica na página do plugin; aqui só o estado
+   dela, com o caminho para lá quando falta algo, e as opções do widget, se ele tiver. *@
 <MudStack Spacing="4">
-    <ConnectionPanel Session="Instance.Session" />
+    @if (Instance.Session.ConnectionState is ObsConnectionState.Ready)
+    {
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Circle" Color="Color.Success" Size="Size.Small" />
+            <MudText Typo="Typo.body2">@ConnectionStatus.Text(Instance.Session)</MudText>
+        </MudStack>
+    }
+    else
+    {
+        <MudAlert Severity="@ConnectionStatus.StateSeverity(Instance.Session)" Dense="true" Variant="Variant.Outlined">
+            <MudText Typo="Typo.body2">@ConnectionStatus.Text(Instance.Session)</MudText>
+            @* Conectando é passageiro; nos outros estados falta algo (senha, endereço, OBS aberto). *@
+            @if (Instance.Session.ConnectionState is not ObsConnectionState.Connecting)
+            {
+                <MudText Typo="Typo.caption" Style="display:block" Class="mt-1">
+                    Endereço e senha valem para todos os widgets do OBS e ficam na página do plugin.
+                </MudText>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" Class="mt-2"
+                           StartIcon="@Icons.Material.Filled.Settings" OnClick="OpenPluginSettings">Configurar a conexão</MudButton>
+                @if (_noPluginPage)
+                {
+                    <MudText Typo="Typo.caption" Style="display:block" Class="mt-1">
+                        Abra Loja de plugins, aba Instalados, e clique em Configurar no OBS.
+                    </MudText>
+                }
+            }
+        </MudAlert>
+    }
 
     @if (Instance.OptionsComponent is { } options)
     {
@@ -13,9 +41,14 @@
 </MudStack>
 
 @code {
+    private bool _noPluginPage;
+
     protected override void OnInitialized() => Instance.Changed += OnChanged;
 
     public void Dispose() => Instance.Changed -= OnChanged;
+
+    // O manager abre a página do plugin na aba Configurações. Se não abriu, diz onde fica.
+    private async Task OpenPluginSettings() => _noPluginPage = !await Context.OpenPluginSettingsAsync();
 
     private void OnChanged() => _ = InvokeAsync(StateHasChanged);
 }
