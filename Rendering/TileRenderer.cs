@@ -95,8 +95,9 @@ public static class TileRenderer
         var textBlock = hasLabel ? labelHeight + (compact ? 4 : 8) : 0;
         var top = compact ? 3f : 6f;
         var iconArea = new RectangleF(0, top, size.Width, size.Height - textBlock - top);
-        // O desenho do ícone tem folga de uns 3/24 de cada lado: a caixa grande deixa o traço visível com ~70% da área.
-        var side = Math.Min(iconArea.Height * 0.88f, size.Width * 0.62f);
+        // O traço visível ocupa até 95% da altura livre e 72% da largura, como o peso dos ícones do Discord. Os desenhos
+        // têm folga de uns 3/24 de cada lado, então a caixa passa do visível em 24/18 (a folga pode sair da área).
+        var side = Math.Min(iconArea.Height * 0.95f, size.Width * 0.72f) * 24f / 18f;
         ObsGlyphs.Draw(g, v.Icon, new RectangleF((size.Width - side) / 2, iconArea.Y + (iconArea.Height - side) / 2, side, side),
             TilePalette.Ink, background: background);
         if (hasLabel)

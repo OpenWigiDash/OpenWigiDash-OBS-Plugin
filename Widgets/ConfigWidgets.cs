@@ -99,9 +99,12 @@ public sealed class ProfileInstance(IWidgetContext context) : ConfigListInstance
 public abstract class ConfigListInstance(IWidgetContext context, ConfigKind kind) : ObsTileInstance(context)
 {
     internal const string RequireHoldKey = "requireHold";
+    /// <summary>Se o OBS não confirmar a troca nesse tempo, o tile volta ao normal.</summary>
+    internal static readonly TimeSpan SwitchWait = TimeSpan.FromSeconds(20);
 
     private int _page;
     private string? _switchingTo;
+    private DateTimeOffset _switchingUntil;
 
     public ConfigKind Kind { get; } = kind;
 
@@ -120,7 +123,24 @@ public abstract class ConfigListInstance(IWidgetContext context, ConfigKind kind
     public override Type? OptionsComponent => typeof(ConfigOptions);
 
     internal int Page => _page;
-    internal bool Busy => _switchingTo is not null || ObsSwitching;
+    internal bool Busy => PendingSwitch is not null || ObsSwitching;
+
+    /// <summary>
+    /// A troca pedida, até o OBS mostrar o item novo como atual. O OBS pode responder ao pedido antes de trocar (o
+    /// perfil leva alguns segundos depois da resposta), então a resposta sozinha não encerra o "Trocando…".
+    /// </summary>
+    private string? PendingSwitch
+    {
+        get
+        {
+            if (_switchingTo is { } target && (Current == target || Now >= _switchingUntil))
+                _switchingTo = null;
+            return _switchingTo;
+        }
+    }
+
+    /// <summary>Redesenha sozinho enquanto espera, para o "Trocando…" sair no fim do prazo.</summary>
+    protected override bool Animating => _switchingTo is not null;
 
     protected internal override async ValueTask LoadSettingsAsync(CancellationToken cancellationToken)
     {
@@ -135,7 +155,7 @@ public abstract class ConfigListInstance(IWidgetContext context, ConfigKind kind
     }
 
     protected override TileVisual GetVisual() =>
-        Visual(Items, Current, _switchingTo, ObsSwitching, Kind, Obs.OutputsActive, BlockedText, RequireHold, Context.PixelSize, _page);
+        Visual(Items, Current, PendingSwitch, ObsSwitching, Kind, Obs.OutputsActive, BlockedText, RequireHold, Context.PixelSize, _page);
 
     internal static TileVisual Visual(IReadOnlyList<string> items, string? current, string? switchingTo, bool switching, ConfigKind kind,
         bool outputsActive, string? blockedText, bool requireHold, PixelSize size, int page)
@@ -233,20 +253,16 @@ public abstract class ConfigListInstance(IWidgetContext context, ConfigKind kind
         }
 
         _switchingTo = item;
+        _switchingUntil = Now + SwitchWait;
         Context.RequestRender();
-        ObsResponse response;
-        try
-        {
-            response = await SwitchAsync(item).ConfigureAwait(false);
-        }
-        finally
+        var response = await SwitchAsync(item).ConfigureAwait(false);
+        // Passou do prazo do pedido mas o OBS ainda está carregando: o "Trocando…" segue pelo evento, não é falha.
+        if (!response.Ok && !ObsSwitching)
         {
             _switchingTo = null;
-            Context.RequestRender();
-        }
-        // Passou do prazo mas o OBS ainda está carregando: o "Trocando…" segue pelo evento, não é falha.
-        if (!response.Ok && !ObsSwitching)
             Check(response, "OBS recusou a troca");
+        }
+        Context.RequestRender();
     }
 
     private void Turn(IReadOnlyList<string> items, int delta)

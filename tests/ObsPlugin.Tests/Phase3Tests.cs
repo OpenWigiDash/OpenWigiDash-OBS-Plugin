@@ -152,6 +152,28 @@ public sealed class ConfigTileTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Profile_KeepsSwitchingUntilObsActuallyChanges()
+    {
+        // O OBS responde ao SetCurrentProfile antes de trocar: o "Trocando…" tem que esperar o evento.
+        _obs.ProfileSwitchDelay = TimeSpan.FromMilliseconds(800);
+        var context = new FakeContext(WidgetSize.Large);
+        var tile = await Create<ProfileInstance>(new ProfileWidget(), context);
+        await tile.OnTouchAsync(TouchCell(context, TouchKind.LongPress, 1), CancellationToken.None);
+        Assert.Equal(1, Count("SetCurrentProfile"));
+        Assert.Equal("Twitch", _session.State.CurrentProfile);
+        Assert.Equal("Trocando…", tile.CurrentVisual().Detail);
+        Assert.Equal(TilePalette.Preview, tile.CurrentVisual().Cells![1].Ring);
+        // Enquanto troca, outro toque não manda nada.
+        await tile.OnTouchAsync(TouchCell(context, TouchKind.LongPress, 0), CancellationToken.None);
+        Assert.Equal(1, Count("SetCurrentProfile"));
+
+        await Wait.Until(() => _session.State.CurrentProfile == "YouTube", "trocou depois");
+        await Wait.Until(() => tile.CurrentVisual().Detail == "Segure para trocar", "saiu do Trocando");
+        Assert.Equal(TilePalette.Ok, tile.CurrentVisual().Cells![1].Fill);
+        await tile.DisposeAsync();
+    }
+
+    [Fact]
     public async Task Profile_BlockedWhileRecording_AndTapSwitchesWithoutHold()
     {
         _obs.Recording = true;

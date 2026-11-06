@@ -65,6 +65,8 @@ internal sealed class FakeObs : IAsyncDisposable
     public string Collection { get; set; } = "Principal";
     public List<string> ProfileNames { get; } = ["Twitch", "YouTube"];
     public string Profile { get; set; } = "Twitch";
+    /// <summary>Como o OBS real na troca de perfil: responde na hora e só troca (com os eventos) depois disso.</summary>
+    public TimeSpan ProfileSwitchDelay { get; set; }
 
     /// <summary>Pedidos que o OBS recusa (ex.: CreateRecordChapter fora do Hybrid MP4).</summary>
     public HashSet<string> Refuse { get; } = [];
@@ -381,6 +383,19 @@ internal sealed class FakeObs : IAsyncDisposable
                         events.Add(("CurrentSceneCollectionChanging", new JsonObject { ["sceneCollectionName"] = Collection }));
                         events.Add(("CurrentSceneCollectionChanged", new JsonObject { ["sceneCollectionName"] = Collection }));
                         break;
+                    case "SetCurrentProfile" when ProfileSwitchDelay > TimeSpan.Zero:
+                    {
+                        var target = (string)data!["profileName"]!;
+                        _ = Task.Run(async () =>
+                        {
+                            await Task.Delay(ProfileSwitchDelay);
+                            lock (_gate)
+                                Profile = target;
+                            await EmitAsync("CurrentProfileChanging", new JsonObject { ["profileName"] = target });
+                            await EmitAsync("CurrentProfileChanged", new JsonObject { ["profileName"] = target });
+                        });
+                        break;
+                    }
                     case "SetCurrentProfile":
                         Profile = (string)data!["profileName"]!;
                         events.Add(("CurrentProfileChanging", new JsonObject { ["profileName"] = Profile }));
