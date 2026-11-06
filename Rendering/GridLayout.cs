@@ -11,6 +11,12 @@ public static class GridLayout
 {
     public const float Pad = 8, Gap = 6;
 
+    /// <summary>Altura da linha de aviso embaixo da grade (coleção e perfil).</summary>
+    public const int FooterHeight = 22;
+
+    /// <summary>Área da grade quando há linha de aviso: o tile sem a faixa de baixo.</summary>
+    public static PixelSize Body(PixelSize size) => new(size.Width, Math.Max(1, size.Height - FooterHeight));
+
     /// <summary>Colunas e linhas que cabem: Large (400x290) dá 3x4, a tela cheia do WigiDash dá 6x7.</summary>
     public static (int Columns, int Rows) Shape(PixelSize size) =>
         (Math.Clamp((int)Math.Round(size.Width / 135.0), 2, 6), Math.Clamp((int)Math.Round(size.Height / 72.0), 2, 7));

@@ -311,6 +311,17 @@ public static class TileRenderer
     private static void DrawGrid(Graphics g, PixelSize size, Fonts fonts, TileVisual v)
     {
         var cells = v.Cells ?? [];
+        var full = size;
+        if (v.GridFooter)
+        {
+            size = GridLayout.Body(full);
+            if (!string.IsNullOrEmpty(v.Detail) && cells.Count > 0)
+            {
+                using var footerFont = fonts.Regular(13);
+                var footer = new RectangleF(GridLayout.Pad, size.Height - 2, full.Width - GridLayout.Pad * 2, GridLayout.FooterHeight - 2);
+                DrawText(g, v.Detail!, footerFont, v.Accent ?? TilePalette.Dim, footer, StringAlignment.Center);
+            }
+        }
         var (columns, rows) = GridLayout.Shape(size);
         for (var i = 0; i < cells.Count && i < columns * rows; i++)
         {
@@ -342,7 +353,7 @@ public static class TileRenderer
         if (cells.Count == 0 && !string.IsNullOrEmpty(v.Detail))
         {
             using var font = fonts.Regular(14);
-            DrawText(g, v.Detail!, font, TilePalette.Dim, new RectangleF(0, 0, size.Width, size.Height), StringAlignment.Center);
+            DrawText(g, v.Detail!, font, TilePalette.Dim, new RectangleF(0, 0, full.Width, full.Height), StringAlignment.Center);
         }
     }
 

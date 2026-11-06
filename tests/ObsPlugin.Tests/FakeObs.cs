@@ -61,6 +61,10 @@ internal sealed class FakeObs : IAsyncDisposable
 
     public double Cpu { get; set; } = 4.5;
     public string TransitionName { get; set; } = "Fade";
+    public List<string> Collections { get; } = ["Principal", "Podcast"];
+    public string Collection { get; set; } = "Principal";
+    public List<string> ProfileNames { get; } = ["Twitch", "YouTube"];
+    public string Profile { get; set; } = "Twitch";
 
     /// <summary>Pedidos que o OBS recusa (ex.: CreateRecordChapter fora do Hybrid MP4).</summary>
     public HashSet<string> Refuse { get; } = [];
@@ -357,6 +361,30 @@ internal sealed class FakeObs : IAsyncDisposable
                         events.Add(("CurrentProgramSceneChanged", new JsonObject { ["sceneName"] = Program }));
                         events.Add(("CurrentPreviewSceneChanged", new JsonObject { ["sceneName"] = Preview }));
                         events.Add(("SceneTransitionEnded", new JsonObject { ["transitionName"] = TransitionName }));
+                        break;
+                    case "GetSceneCollectionList":
+                        response = new JsonObject
+                        {
+                            ["currentSceneCollectionName"] = Collection,
+                            ["sceneCollections"] = new JsonArray([.. Collections.Select(c => (JsonNode)c)]),
+                        };
+                        break;
+                    case "GetProfileList":
+                        response = new JsonObject
+                        {
+                            ["currentProfileName"] = Profile,
+                            ["profiles"] = new JsonArray([.. ProfileNames.Select(p => (JsonNode)p)]),
+                        };
+                        break;
+                    case "SetCurrentSceneCollection":
+                        Collection = (string)data!["sceneCollectionName"]!;
+                        events.Add(("CurrentSceneCollectionChanging", new JsonObject { ["sceneCollectionName"] = Collection }));
+                        events.Add(("CurrentSceneCollectionChanged", new JsonObject { ["sceneCollectionName"] = Collection }));
+                        break;
+                    case "SetCurrentProfile":
+                        Profile = (string)data!["profileName"]!;
+                        events.Add(("CurrentProfileChanging", new JsonObject { ["profileName"] = Profile }));
+                        events.Add(("CurrentProfileChanged", new JsonObject { ["profileName"] = Profile }));
                         break;
                     case "GetSourceScreenshot":
                         response = new JsonObject { ["imageData"] = "data:image/jpg;base64," + Convert.ToBase64String([0xFF, 0xD8, 0xFF, 0xD9]) };
