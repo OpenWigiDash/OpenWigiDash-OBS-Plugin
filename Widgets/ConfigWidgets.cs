@@ -15,7 +15,7 @@ public sealed class SceneCollectionWidget : ObsWidgetBase
     public override WidgetManifest Manifest { get; } = CreateManifest(
         new Guid("da2377b7-483c-424d-9f44-52092dc58251"), "OBS: Coleção de cenas",
         "Todas as coleções de cenas numa grade, com a atual em verde. Segure para trocar (a troca recarrega todas as cenas e fontes).",
-        WidgetSize.Wide, WidgetSize.Large) with { SupportsFullscreen = true };
+        WidgetSize.Small, WidgetSize.Wide, WidgetSize.Large) with { SupportsFullscreen = true };
 
     protected override string CatalogLabel => "Coleções";
 
@@ -32,7 +32,7 @@ public sealed class ProfileWidget : ObsWidgetBase
     public override WidgetManifest Manifest { get; } = CreateManifest(
         new Guid("a2c96055-b24b-4d53-9610-77337600d348"), "OBS: Perfil",
         "Todos os perfis numa grade, com o atual em verde. Segure para trocar. Com live, gravação, replay ou câmera virtual ligados, a troca fica bloqueada.",
-        WidgetSize.Wide, WidgetSize.Large) with { SupportsFullscreen = true };
+        WidgetSize.Small, WidgetSize.Wide, WidgetSize.Large) with { SupportsFullscreen = true };
 
     protected override TileVisual Preview => ConfigListInstance.Visual(
         ["Twitch", "YouTube", "Gravação 4K"], "Twitch", switchingTo: null, switching: false, ConfigKind.Profile,

@@ -90,6 +90,12 @@ public class ConfigStateTests
         Assert.Equal("B", ConfigListInstance.ItemAt(items, size, 0, (int)(second.X + second.Width / 2), (int)(second.Y + second.Height / 2)));
         // A faixa do aviso não é célula.
         Assert.Null(ConfigListInstance.ItemAt(items, size, 0, 200, size.Height - 5));
+
+        // No Small (2x2 meias células) a grade fica 2x2: cabem três itens e a célula vazia.
+        var small = new FakeContext(WidgetSize.Small).PixelSize;
+        Assert.Equal((2, 2), GridLayout.Shape(GridLayout.Body(small)));
+        var visual = ConfigListInstance.Visual(items, "A", null, false, ConfigKind.Profile, false, null, true, small, 0);
+        Assert.Equal(3, visual.Cells!.Count);
     }
 }
 

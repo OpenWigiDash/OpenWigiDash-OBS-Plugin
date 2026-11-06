@@ -24,8 +24,8 @@ Fala com o OBS pelo **obs-websocket v5**, que já vem dentro do OBS 28 ou mais n
 | OBS: Modo estúdio | Liga e desliga o modo estúdio | | Mini, Small |
 | OBS: Transição | Manda a prévia para o ar com a transição atual | | Mini, Small |
 | OBS: Mídia | Play e pause (parada, começa do início) | Reinicia | Small, Wide |
-| OBS: Coleção de cenas | Só avisa "Segure para trocar" (opção: tocar já troca) | Troca para a coleção tocada | Wide, Large, com tela cheia |
-| OBS: Perfil | Só avisa "Segure para trocar" (opção: tocar já troca) | Troca para o perfil tocado (bloqueado com saída ligada) | Wide, Large, com tela cheia |
+| OBS: Coleção de cenas | Só avisa "Segure para trocar" (opção: tocar já troca) | Troca para a coleção tocada | Small, Wide, Large, com tela cheia |
+| OBS: Perfil | Só avisa "Segure para trocar" (opção: tocar já troca) | Troca para o perfil tocado (bloqueado com saída ligada) | Small, Wide, Large, com tela cheia |
 
 O que cada tile mostra:
 
