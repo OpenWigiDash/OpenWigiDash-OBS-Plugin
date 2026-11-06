@@ -24,6 +24,8 @@ Fala com o OBS pelo **obs-websocket v5**, que já vem dentro do OBS 28 ou mais n
 | OBS: Modo estúdio | Liga e desliga o modo estúdio | | Mini, Small |
 | OBS: Transição | Manda a prévia para o ar com a transição atual | | Mini, Small |
 | OBS: Mídia | Play e pause (parada, começa do início) | Reinicia | Small, Wide |
+| OBS: Coleção de cenas | Só avisa "Segure para trocar" (opção: tocar já troca) | Troca para a coleção tocada | Small, Wide, Large, com tela cheia |
+| OBS: Perfil | Só avisa "Segure para trocar" (opção: tocar já troca) | Troca para o perfil tocado (bloqueado com saída ligada) | Small, Wide, Large, com tela cheia |
 
 O que cada tile mostra:
 
@@ -36,6 +38,10 @@ O que cada tile mostra:
   Modos: muta e desmuta, push to talk (segure para falar) e push to mute (segure para mutar).
 - **Replay buffer**: "Salvar clipe" com o buffer ligado; depois de salvar, "Salvo" e o nome do arquivo.
 - **Câmera virtual**: ligada (azul) ou desligada.
+- **Coleção de cenas** e **Perfil**: grade com a atual em verde e, embaixo, o que o toque faz. Durante a troca, a que
+  está entrando ganha anel azul e o tile mostra "Trocando…" até o OBS confirmar, ignorando novos toques. Com live ou
+  gravação rodando, a coleção avisa em amarelo (a troca recarrega cenas e fontes) e o perfil fica bloqueado em vermelho,
+  dizendo qual saída parar (o perfil muda servidor, chave, encoder e pasta de gravação).
 - **Painel de cenas**: todas as cenas numa grade, a do ar em verde e a da prévia com anel azul. Arraste para cima para
   abrir em tela cheia e para baixo para voltar. Com mais cenas do que cabem, a última célula vira "Mais" e troca a
   página; na tela cheia, arrastar para os lados também troca.

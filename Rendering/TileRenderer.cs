@@ -33,7 +33,13 @@ public static class TileRenderer
             g.Clear(clear);
             // O símbolo do OBS grande no canto, um tom acima do fundo, como o do Discord: marca o tile como do OBS
             // sem brigar com a informação. Acompanha a cor do estado porque sai do próprio fundo.
-            DrawLogo(g, size, TilePalette.Blend(clear, Color.White, visual.Layout == TileLayout.Offline ? 0.05 : 0.075));
+            // No catálogo o ícone aparece reduzido, então o símbolo vai um pouco mais forte para continuar visível.
+            DrawLogo(g, size, TilePalette.Blend(clear, Color.White, visual.Layout switch
+            {
+                TileLayout.Offline => 0.05,
+                TileLayout.Catalog => 0.13,
+                _ => 0.075,
+            }));
 
             var mini = size.Height < 100;
             var wide = size.Width >= size.Height * 2.2f;
@@ -89,13 +95,16 @@ public static class TileRenderer
     /// <summary>Ícone do catálogo: ícone no meio e nome curto embaixo, nas mesmas proporções do Discord.</summary>
     private static void DrawCatalog(Graphics g, PixelSize size, Fonts fonts, TileVisual v, Color background)
     {
-        var compact = size.Height < 100;
-        var labelHeight = compact ? Math.Max(12, size.Height / 5f) : Math.Max(16, size.Height / 7f);
+        // O Manager reduz o quadro inteiro para a caixa do catálogo (88x64), seja ele Mini, Small ou Large. Por isso as
+        // medidas são proporcionais à altura, iguais em todos os tamanhos: o rótulo sai do mesmo tamanho na tela.
+        var labelHeight = Math.Max(12, size.Height / 5f);
         var hasLabel = !string.IsNullOrEmpty(v.Big);
-        var textBlock = hasLabel ? labelHeight + (compact ? 4 : 8) : 0;
-        var top = compact ? 3f : 6f;
+        var textBlock = hasLabel ? labelHeight + size.Height * 0.05f : 0;
+        var top = size.Height * 0.04f;
         var iconArea = new RectangleF(0, top, size.Width, size.Height - textBlock - top);
-        var side = Math.Min(iconArea.Height * 0.62f, size.Width * 0.4f);
+        // O traço visível ocupa até 95% da altura livre e 72% da largura, como o peso dos ícones do Discord. Os desenhos
+        // têm folga de uns 3/24 de cada lado, então a caixa passa do visível em 24/18 (a folga pode sair da área).
+        var side = Math.Min(iconArea.Height * 0.95f, size.Width * 0.72f) * 24f / 18f;
         ObsGlyphs.Draw(g, v.Icon, new RectangleF((size.Width - side) / 2, iconArea.Y + (iconArea.Height - side) / 2, side, side),
             TilePalette.Ink, background: background);
         if (hasLabel)
@@ -311,6 +320,17 @@ public static class TileRenderer
     private static void DrawGrid(Graphics g, PixelSize size, Fonts fonts, TileVisual v)
     {
         var cells = v.Cells ?? [];
+        var full = size;
+        if (v.GridFooter)
+        {
+            size = GridLayout.Body(full);
+            if (!string.IsNullOrEmpty(v.Detail) && cells.Count > 0)
+            {
+                using var footerFont = fonts.Regular(13);
+                var footer = new RectangleF(GridLayout.Pad, size.Height - 2, full.Width - GridLayout.Pad * 2, GridLayout.FooterHeight - 2);
+                DrawText(g, v.Detail!, footerFont, v.Accent ?? TilePalette.Dim, footer, StringAlignment.Center);
+            }
+        }
         var (columns, rows) = GridLayout.Shape(size);
         for (var i = 0; i < cells.Count && i < columns * rows; i++)
         {
@@ -342,7 +362,7 @@ public static class TileRenderer
         if (cells.Count == 0 && !string.IsNullOrEmpty(v.Detail))
         {
             using var font = fonts.Regular(14);
-            DrawText(g, v.Detail!, font, TilePalette.Dim, new RectangleF(0, 0, size.Width, size.Height), StringAlignment.Center);
+            DrawText(g, v.Detail!, font, TilePalette.Dim, new RectangleF(0, 0, full.Width, full.Height), StringAlignment.Center);
         }
     }
 

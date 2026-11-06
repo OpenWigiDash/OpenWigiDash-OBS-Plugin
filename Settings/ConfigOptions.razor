@@ -1,0 +1,14 @@
+@* Opções dos widgets Coleção de cenas e Perfil. *@
+<MudCheckBox T="bool" Value="Instance.RequireHold" ValueChanged="v => Instance.SetRequireHoldAsync(v)" Color="Color.Primary">
+    Exigir segurar para trocar
+</MudCheckBox>
+<MudText Typo="Typo.caption" Class="mud-text-secondary">
+    @(Instance.Kind == ConfigKind.Profile
+        ? "Trocar de perfil muda servidor, chave da live, encoder e pasta de gravação. Com alguma saída ligada, a troca fica bloqueada."
+        : "Trocar de coleção recarrega todas as cenas e fontes e leva alguns segundos.")
+</MudText>
+
+@code {
+    [Parameter, EditorRequired]
+    public ConfigListInstance Instance { get; set; } = default!;
+}

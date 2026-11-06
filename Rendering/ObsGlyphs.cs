@@ -26,6 +26,10 @@ public enum ObsIcon
     Text,
     Image,
     Grid,
+    /// <summary>Coleção de cenas: quadros empilhados.</summary>
+    Collection,
+    /// <summary>Perfil: busto de uma pessoa.</summary>
+    Profile,
 }
 
 /// <summary>Desenha um <see cref="ObsIcon"/> dentro de uma caixa quadrada, no traço dos protótipos (1,8 de 24).</summary>
@@ -158,6 +162,29 @@ internal static class ObsGlyphs
                 {
                     using var cell = Rounded(R(x, y, 7.5f, 6.5f), 1.5f * s);
                     g.DrawPath(pen, cell);
+                }
+                break;
+            case ObsIcon.Collection:
+                using (var back = Rounded(R(7.5f, 3.5f, 13, 9.5f), 1.5f * s))
+                    g.DrawPath(pen, back);
+                g.DrawLines(pen, [P(5.5f, 15.5f), P(5.5f, 8), P(7.5f, 8)]);
+                using (var front = Rounded(R(3.5f, 10, 13, 10), 1.5f * s))
+                {
+                    if (background is { } under)
+                    {
+                        using var cover = new SolidBrush(under);
+                        g.FillPath(cover, front);
+                    }
+                    g.DrawPath(pen, front);
+                }
+                break;
+            case ObsIcon.Profile:
+                g.DrawEllipse(pen, Circle(12, 8.5f, 4));
+                using (var shoulders = new GraphicsPath())
+                {
+                    shoulders.AddBezier(P(4.5f, 20.5f), P(5, 15), P(8.5f, 13.8f), P(12, 13.8f));
+                    shoulders.AddBezier(P(12, 13.8f), P(15.5f, 13.8f), P(19, 15), P(19.5f, 20.5f));
+                    g.DrawPath(pen, shoulders);
                 }
                 break;
         }

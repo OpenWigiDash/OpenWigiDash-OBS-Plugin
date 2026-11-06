@@ -321,7 +321,8 @@ public sealed class TileTests : IAsyncLifetime
     public async Task Manifests_AreUnique()
     {
         ObsWidgetBase[] widgets = [new RecordWidget(), new StreamWidget(), new SceneWidget(), new MixerWidget(), new ReplayBufferWidget(), new VirtualCamWidget(),
-            new ScenePanelWidget(), new StatusWidget(), new SourceVisibilityWidget(), new FilterWidget(), new StudioModeWidget(), new TransitionWidget(), new MediaWidget()];
+            new ScenePanelWidget(), new StatusWidget(), new SourceVisibilityWidget(), new FilterWidget(), new StudioModeWidget(), new TransitionWidget(), new MediaWidget(),
+            new SceneCollectionWidget(), new ProfileWidget()];
         Assert.Equal(widgets.Length, widgets.Select(w => w.Manifest.Id).Distinct().Count());
         Assert.All(widgets, w => Assert.StartsWith("OBS: ", w.Manifest.Name));
         await Task.CompletedTask;
@@ -332,7 +333,8 @@ public sealed class TileTests : IAsyncLifetime
     {
         // Todos no mesmo layout (ícone + nome curto), sem miniatura do tile, e cada um com ícone próprio.
         ObsWidgetBase[] widgets = [new RecordWidget(), new StreamWidget(), new SceneWidget(), new MixerWidget(), new ReplayBufferWidget(), new VirtualCamWidget(),
-            new ScenePanelWidget(), new StatusWidget(), new SourceVisibilityWidget(), new FilterWidget(), new StudioModeWidget(), new TransitionWidget(), new MediaWidget()];
+            new ScenePanelWidget(), new StatusWidget(), new SourceVisibilityWidget(), new FilterWidget(), new StudioModeWidget(), new TransitionWidget(), new MediaWidget(),
+            new SceneCollectionWidget(), new ProfileWidget()];
         Assert.All(widgets, w => Assert.Equal(TileLayout.Catalog, w.CatalogVisual.Layout));
         Assert.All(widgets, w => Assert.InRange(w.CatalogVisual.Big!.Length, 1, 14));
         Assert.Equal(widgets.Length, widgets.Select(w => w.CatalogVisual.Icon).Distinct().Count());

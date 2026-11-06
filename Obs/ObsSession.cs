@@ -41,6 +41,8 @@ public sealed partial class ObsSession : IAsyncDisposable
     private static readonly TimeSpan[] DefaultBackoff =
         [TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(30)];
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(10);
+    /// <summary>Coleção grande pode levar mais que um pedido comum para carregar.</summary>
+    private static readonly TimeSpan SwitchTimeout = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan MeterFrame = TimeSpan.FromMilliseconds(100);
     internal static readonly TimeSpan ThumbnailInterval = TimeSpan.FromSeconds(1);
     internal const int ThumbnailWidth = 400;
@@ -178,7 +180,11 @@ public sealed partial class ObsSession : IAsyncDisposable
     // ---- pedidos ----
 
     /// <summary>Manda um pedido e espera a resposta. Sem conexão, devolve uma resposta de falha (não lança).</summary>
-    public async Task<ObsResponse> RequestAsync(string requestType, JsonObject? data = null, CancellationToken cancellationToken = default)
+    public Task<ObsResponse> RequestAsync(string requestType, JsonObject? data = null, CancellationToken cancellationToken = default) =>
+        RequestAsync(requestType, data, RequestTimeout, cancellationToken);
+
+    /// <summary>Com prazo próprio: a troca de coleção só responde depois de recarregar tudo.</summary>
+    internal async Task<ObsResponse> RequestAsync(string requestType, JsonObject? data, TimeSpan timeout, CancellationToken cancellationToken)
     {
         if (_socket is not { State: WebSocketState.Open } || ConnectionState != ObsConnectionState.Ready)
             return new ObsResponse(false, 0, "Sem conexão com o OBS.", default);
@@ -188,7 +194,7 @@ public sealed partial class ObsSession : IAsyncDisposable
         try
         {
             await SendAsync(ObsProtocol.RequestMessage(requestType, id, data), cancellationToken).ConfigureAwait(false);
-            return await pending.Task.WaitAsync(RequestTimeout, _time, cancellationToken).ConfigureAwait(false);
+            return await pending.Task.WaitAsync(timeout, _time, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is TimeoutException or WebSocketException or ObjectDisposedException or InvalidOperationException)
         {
@@ -212,6 +218,13 @@ public sealed partial class ObsSession : IAsyncDisposable
 
     public Task<ObsResponse> SetProgramSceneAsync(string scene) =>
         RequestAsync("SetCurrentProgramScene", new JsonObject { ["sceneName"] = scene });
+
+    /// <summary>Troca a coleção de cenas. O OBS só responde quando terminou de carregar a nova.</summary>
+    public Task<ObsResponse> SetSceneCollectionAsync(string collection) =>
+        RequestAsync("SetCurrentSceneCollection", new JsonObject { ["sceneCollectionName"] = collection }, SwitchTimeout, CancellationToken.None);
+
+    public Task<ObsResponse> SetProfileAsync(string profile) =>
+        RequestAsync("SetCurrentProfile", new JsonObject { ["profileName"] = profile }, SwitchTimeout, CancellationToken.None);
 
     public Task<ObsResponse> SetPreviewSceneAsync(string scene) =>
         RequestAsync("SetCurrentPreviewScene", new JsonObject { ["sceneName"] = scene });
@@ -478,6 +491,7 @@ public sealed partial class ObsSession : IAsyncDisposable
         if (vcam.Ok)
             State.ApplyVirtualCam(vcam.Data);
         await SyncInputsAsync(token).ConfigureAwait(false);
+        await SyncConfigAsync(token).ConfigureAwait(false);
         await SyncMoreAsync(token).ConfigureAwait(false);
         RaiseChanged();
     }
@@ -487,6 +501,17 @@ public sealed partial class ObsSession : IAsyncDisposable
         var scenes = await RequestAsync("GetSceneList", null, token).ConfigureAwait(false);
         if (scenes.Ok && State.ApplySceneList(scenes.Data).Changed)
             RaiseChanged();
+    }
+
+    /// <summary>Coleções de cenas e perfis: as listas e qual está ativa.</summary>
+    private async Task SyncConfigAsync(CancellationToken token)
+    {
+        var collections = await RequestAsync("GetSceneCollectionList", null, token).ConfigureAwait(false);
+        if (collections.Ok)
+            State.ApplySceneCollectionList(collections.Data);
+        var profiles = await RequestAsync("GetProfileList", null, token).ConfigureAwait(false);
+        if (profiles.Ok)
+            State.ApplyProfileList(profiles.Data);
     }
 
     private async Task SyncOutputsAsync(CancellationToken token)

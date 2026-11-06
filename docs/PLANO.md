@@ -36,8 +36,9 @@ a cada segundo só com um Status acordado; o cursor da mídia anda sozinho no ti
 
 ## Fase 3
 
-- Troca de coleção de cenas.
-- Hotkeys do OBS por nome.
+- Coleção de cenas e Perfil: grade como o painel de cenas, troca só segurando (opção para tocar), "Trocando…" até o
+  OBS confirmar, perfil bloqueado com live, gravação, replay ou câmera virtual ligados.
+- Hotkeys do OBS por nome (depois).
 
 ## Falta testar no aparelho
 

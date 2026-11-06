@@ -102,6 +102,12 @@ public sealed record TileVisual(ObsIcon Icon)
     /// <summary>Células do layout <see cref="TileLayout.Grid"/>, na ordem de leitura.</summary>
     public IReadOnlyList<GridCell>? Cells { get; init; }
 
+    /// <summary>
+    /// Grade com uma linha embaixo para o <see cref="Detail"/> (na cor do <see cref="Accent"/>): a grade fica em
+    /// <see cref="GridLayout.Body"/>.
+    /// </summary>
+    public bool GridFooter { get; init; }
+
     /// <summary>Linhas do layout <see cref="TileLayout.Stats"/>.</summary>
     public IReadOnlyList<StatLine>? Lines { get; init; }
 }

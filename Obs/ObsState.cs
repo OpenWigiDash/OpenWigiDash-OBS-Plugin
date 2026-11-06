@@ -111,6 +111,7 @@ public sealed partial class ObsState(TimeProvider time)
             _inputs = new(StringComparer.Ordinal);
             _thumbnails = new(StringComparer.Ordinal);
             ResetMore();
+            ResetConfig();
         }
     }
 
@@ -248,8 +249,8 @@ public sealed partial class ObsState(TimeProvider time)
                     PruneThumbnails();
                 }
                 return ObsUpdate.Change;
-            case "SceneCreated" or "SceneRemoved" or "SceneNameChanged" or "CurrentSceneCollectionChanged":
-                return new ObsUpdate(true, NeedsScenes: true, NeedsInputs: type == "CurrentSceneCollectionChanged");
+            case "SceneCreated" or "SceneRemoved" or "SceneNameChanged":
+                return new ObsUpdate(true, NeedsScenes: true);
             case "StudioModeStateChanged":
                 return ApplyStudioMode(data);
             case "RecordStateChanged":
@@ -273,7 +274,7 @@ public sealed partial class ObsState(TimeProvider time)
             case "InputCreated" or "InputRemoved" or "InputNameChanged":
                 return new ObsUpdate(true, NeedsInputs: true);
             default:
-                return ApplyMoreEvent(type, data);
+                return ApplyConfigEvent(type, data);
         }
     }
 
