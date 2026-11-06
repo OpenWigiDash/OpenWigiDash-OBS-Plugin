@@ -1,7 +1,7 @@
 # OBS Studio para o WigiDash (OpenWigiDashManager)
 
 Plugin do OBS Studio para o painel WigiDash da G.SKILL, no
-[OpenWigiDashManager](https://github.com/OpenWigiDash/OpenWigiDashManager) (.NET 10, SDK 3.0). Controla o OBS
+[OpenWigiDashManager](https://github.com/OpenWigiDash/OpenWigiDashManager) (.NET 10, SDK 3.2). Controla o OBS
 pelo tile e mostra o que está acontecendo nele: tempo de gravação e de live, bitrate, nível do microfone,
 qual cena está no ar e a miniatura dela.
 
@@ -56,7 +56,8 @@ Sem o OBS pronto, todos os tiles mostram o porquê: **OBS fechado**, **Falta a s
 
 ## Conexão
 
-Nas configurações de qualquer widget do OBS (a conexão é a mesma para todos):
+Na página do plugin no OpenWigiDash: **Loja de plugins > Instalados > OBS > Configurar** (a conexão é a mesma para todos
+os widgets do OBS; a tela de cada widget mostra o estado e, quando falta algo, o botão **Configurar a conexão**):
 
 - **Endereço e porta**: `127.0.0.1` e `4455` quando o OBS roda no mesmo PC.
 - **Senha**: no OBS, *Ferramentas > Configurações do servidor WebSocket > Mostrar informações de conexão*.

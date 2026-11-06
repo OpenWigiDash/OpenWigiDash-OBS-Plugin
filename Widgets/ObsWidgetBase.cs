@@ -5,6 +5,9 @@ using OpenWigiDash.ObsPlugin.Obs;
 using OpenWigiDash.ObsPlugin.Rendering;
 using OpenWigiDash.ObsPlugin.Settings;
 
+// Endereço e senha do obs-websocket: uma vez só, na página do plugin no manager.
+[assembly: OpenWigiPluginSettings(typeof(ObsPluginSettings))]
+
 namespace OpenWigiDash.ObsPlugin.Widgets;
 
 /// <summary>
