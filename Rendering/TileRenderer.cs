@@ -95,7 +95,8 @@ public static class TileRenderer
         var textBlock = hasLabel ? labelHeight + (compact ? 4 : 8) : 0;
         var top = compact ? 3f : 6f;
         var iconArea = new RectangleF(0, top, size.Width, size.Height - textBlock - top);
-        var side = Math.Min(iconArea.Height * 0.62f, size.Width * 0.4f);
+        // O desenho do ícone tem folga de uns 3/24 de cada lado: a caixa grande deixa o traço visível com ~70% da área.
+        var side = Math.Min(iconArea.Height * 0.88f, size.Width * 0.62f);
         ObsGlyphs.Draw(g, v.Icon, new RectangleF((size.Width - side) / 2, iconArea.Y + (iconArea.Height - side) / 2, side, side),
             TilePalette.Ink, background: background);
         if (hasLabel)
