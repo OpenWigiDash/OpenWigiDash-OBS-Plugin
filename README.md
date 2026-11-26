@@ -18,7 +18,7 @@ Fala com o OBS pelo **obs-websocket v5**, que já vem dentro do OBS 28 ou mais n
 | OBS: Replay buffer | Salva o clipe (liga o buffer se estiver desligado) | Desliga o buffer | Mini, Small |
 | OBS: Câmera virtual | Liga e desliga | | Mini, Small |
 | OBS: Painel de cenas | Troca para a cena tocada (no modo estúdio, para a prévia) | Manda direto para o ar | Large, com tela cheia |
-| OBS: Status | | Com o OBS fechado neste PC, abre o OBS | Small, Wide |
+| OBS: Status | | Com o OBS fechado neste PC, abre o OBS (só em conexão local) | Small, Wide |
 | OBS: Fonte visível | Mostra e esconde uma fonte da cena | Inverte só enquanto segura | Mini, Small |
 | OBS: Filtro | Liga e desliga um filtro de uma fonte ou cena | Inverte só enquanto segura | Mini, Small |
 | OBS: Modo estúdio | Liga e desliga o modo estúdio | | Mini, Small |
@@ -57,21 +57,35 @@ O que cada tile mostra:
 Os toques que encerram algo (parar a live, desligar o buffer) pedem long-press, com a barra enchendo embaixo do tile.
 Quando o OBS recusa um comando, o tile fica vermelho por alguns segundos com o motivo.
 
-Sem o OBS pronto, todos os tiles mostram o porquê: **OBS fechado**, **Falta a senha**, **Senha errada**,
-**Atualize o OBS** ou **Conectando…**. Eles voltam sozinhos quando o OBS abre.
+Sem o OBS pronto, todos os tiles mostram o porquê: **OBS fechado** (conexão neste PC), **Sem resposta** (conexão com
+outro PC: pode ser o PC desligado, o OBS fechado ou o firewall), **Falta a senha**, **Senha errada**, **Atualize o OBS**
+ou **Conectando…**. Eles voltam sozinhos quando o OBS responde.
 
-## Conexão
+## Conexões
 
-Na página do plugin no OpenWigiDash: **Loja de plugins > Instalados > OBS > Configurar** (a conexão é a mesma para todos
-os widgets do OBS; a tela de cada widget mostra o estado e, quando falta algo, o botão **Configurar a conexão**):
+Na página do plugin no OpenWigiDash: **Loja de plugins > Instalados > OBS > Configurar**. Dá para salvar mais de uma
+conexão, por exemplo o OBS deste PC e o OBS de outro PC da rede, cada uma com:
 
-- **Endereço e porta**: `127.0.0.1` e `4455` quando o OBS roda no mesmo PC.
+- **Nome**: como ela aparece na escolha de cada widget (ex.: *Este PC*, *PC da live*).
+- **Endereço e porta**: `127.0.0.1` e `4455` quando o OBS roda no mesmo PC; o IP ou o nome do outro PC quando não.
+  No outro PC, a porta do servidor WebSocket precisa estar liberada no firewall do Windows.
 - **Senha**: no OBS, *Ferramentas > Configurações do servidor WebSocket > Mostrar informações de conexão*.
-  O botão **Detectar neste PC** lê a porta e a senha do arquivo do próprio OBS
+  Em conexão local, o botão **Detectar neste PC** lê a porta e a senha do arquivo do próprio OBS
   (`%APPDATA%\obs-studio\plugin_config\obs-websocket\config.json`), só quando é clicado.
 
-A senha fica em `%LOCALAPPDATA%\OpenWigiDash\WidgetData\OBS\connection.json`, criptografada com o DPAPI do Windows
-(só o seu usuário, neste PC, consegue abrir). Ela não vai para o log. O log de conexão fica em `obs.log`, na mesma pasta.
+Uma das conexões é a **padrão**. Na tela de cada widget, o campo **Conexão** (aparece com duas ou mais) escolhe qual OBS
+ele controla; quem não escolheu segue a padrão. Assim uma página do Canvas pode ficar toda no OBS deste PC e outra no OBS
+do outro PC. Se a conexão de um widget for removida, ele passa para a padrão. Cada conexão só abre enquanto algum widget
+dela está na tela (ou a página do plugin está aberta).
+
+O plugin não procura o processo do OBS: o estado vem só da conexão WebSocket. O que só vale para o OBS deste PC (dizer
+**OBS fechado**, abrir o OBS segurando o Status e **Detectar neste PC**) fica só para conexão local: `127.0.0.1`,
+`localhost`, o nome deste PC ou um IP dele.
+
+As conexões ficam em `%LOCALAPPDATA%\OpenWigiDash\WidgetData\OBS\connections.json`, com a senha criptografada pelo DPAPI
+do Windows (só o seu usuário, neste PC, consegue abrir). Ela não vai para o log. Quem usava a versão com uma conexão só
+encontra a de antes (`connection.json`) como a conexão padrão, sem refazer nada. O log de conexão fica em `obs.log`, na
+mesma pasta, com o id da conexão em cada linha.
 
 ### O que mudou em relação ao plugin do OBS no Stream Deck
 

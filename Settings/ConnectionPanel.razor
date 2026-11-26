@@ -1,72 +1,176 @@
-@using OpenWigiDash.ObsPlugin.Obs
 @implements IDisposable
 
-@* Endereço e senha do obs-websocket. Vale para todos os widgets do OBS (uma conexão só): fica na página do plugin. *@
-<MudStack Spacing="3">
-    <MudAlert Severity="@StateSeverity" Dense="true" Variant="Variant.Outlined">
-        @StateText
-        @if (Session.ConnectionState is not (ObsConnectionState.Ready or ObsConnectionState.Connecting) && Session.LastError is { } error)
+@* Uma conexão com o obs-websocket: nome, endereço, porta e senha, com o estado dela. A página do plugin mostra uma
+   destas para cada conexão salva, e uma em branco ao adicionar. *@
+<MudPaper Outlined="true" Class="pa-4">
+    <MudStack Spacing="3">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudText Typo="Typo.subtitle1">@(IsNew ? "Nova conexão" : Connection.Name)</MudText>
+            @if (IsDefault)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined">Padrão</MudChip>
+            }
+        </MudStack>
+
+        @if (Session is { } session)
         {
-            <MudText Typo="Typo.caption" Style="display:block;opacity:.8">Detalhe: @error</MudText>
-            <MudText Typo="Typo.caption" Style="display:block;opacity:.8">Log: %LOCALAPPDATA%\OpenWigiDash\WidgetData\OBS\obs.log</MudText>
+            <MudAlert Severity="@ConnectionStatus.StateSeverity(session)" Dense="true" Variant="Variant.Outlined">
+                @ConnectionStatus.Text(session)
+                @if (session.ConnectionState is not (ObsConnectionState.Ready or ObsConnectionState.Connecting) && session.LastError is { } error)
+                {
+                    <MudText Typo="Typo.caption" Style="display:block;opacity:.8">Detalhe: @error</MudText>
+                    <MudText Typo="Typo.caption" Style="display:block;opacity:.8">Log: %LOCALAPPDATA%\OpenWigiDash\WidgetData\OBS\obs.log</MudText>
+                }
+            </MudAlert>
         }
-    </MudAlert>
 
-    <MudStack Row="true" AlignItems="AlignItems.Start" Spacing="2">
-        <MudTextField T="string" @bind-Value="_host" Label="Endereço" Variant="Variant.Outlined" Style="min-width:200px"
-                      HelperText="127.0.0.1 quando o OBS roda neste PC." />
-        <MudNumericField T="int" @bind-Value="_port" Label="Porta" Variant="Variant.Outlined" Min="1" Max="65535"
-                         HideSpinButtons="true" Style="max-width:120px" />
+        <MudTextField T="string" @bind-Value="_name" Label="Nome" Variant="Variant.Outlined" Style="max-width:320px"
+                      HelperText="Como aparece na escolha da conexão de cada widget. Ex.: Este PC, PC da live." />
+
+        <MudStack Row="true" AlignItems="AlignItems.Start" Spacing="2">
+            <MudTextField T="string" @bind-Value="_host" Label="Endereço" Variant="Variant.Outlined" Style="min-width:200px"
+                          Immediate="true"
+                          HelperText="127.0.0.1 quando o OBS roda neste PC. Em outro PC da rede, o IP ou o nome dele." />
+            <MudNumericField T="int" @bind-Value="_port" Label="Porta" Variant="Variant.Outlined" Min="1" Max="65535"
+                             HideSpinButtons="true" Style="max-width:120px" />
+        </MudStack>
+
+        <MudTextField T="string" @bind-Value="_password" Label="Senha do servidor WebSocket" Variant="Variant.Outlined"
+                      InputType="@(_showPassword ? InputType.Text : InputType.Password)"
+                      Adornment="Adornment.End" AdornmentIcon="@(_showPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                      OnAdornmentClick="() => _showPassword = !_showPassword"
+                      HelperText="@PasswordHelp" />
+
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save" OnClick="Save">Salvar e conectar</MudButton>
+            @if (TypedIsLocal)
+            {
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Search" OnClick="Detect">Detectar neste PC</MudButton>
+            }
+            @if (IsNew)
+            {
+                <MudButton Variant="Variant.Text" OnClick="OnCancel">Cancelar</MudButton>
+            }
+            else
+            {
+                @if (Session is { } s)
+                {
+                    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Refresh" OnClick="s.Reconnect">Tentar de novo</MudButton>
+                }
+                @if (!IsDefault)
+                {
+                    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Star" OnClick="OnMakeDefault">Tornar padrão</MudButton>
+                }
+                @if (CanRemove)
+                {
+                    <MudButton Variant="Variant.Text" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete" OnClick="Remove">
+                        @(_confirmRemove ? "Clique de novo para remover" : "Remover")
+                    </MudButton>
+                }
+            }
+        </MudStack>
+
+        @if (_confirmRemove)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Warning">Os widgets ligados a esta conexão passam para a padrão.</MudText>
+        }
+        @if (_message is { } message)
+        {
+            <MudText Typo="Typo.caption" Color="@(_messageOk ? Color.Success : Color.Warning)">@message</MudText>
+        }
     </MudStack>
-
-    <MudTextField T="string" @bind-Value="_password" Label="Senha do servidor WebSocket" Variant="Variant.Outlined"
-                  InputType="@(_showPassword ? InputType.Text : InputType.Password)"
-                  Adornment="Adornment.End" AdornmentIcon="@(_showPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
-                  OnAdornmentClick="() => _showPassword = !_showPassword"
-                  HelperText="No OBS: Ferramentas > Configurações do servidor WebSocket > Mostrar informações de conexão. Fica guardada criptografada só para o seu usuário do Windows." />
-
-    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save" OnClick="Save">Salvar e conectar</MudButton>
-        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Search" OnClick="Detect">Detectar neste PC</MudButton>
-        <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Refresh" OnClick="Session.Reconnect">Tentar de novo</MudButton>
-    </MudStack>
-
-    @if (_message is { } message)
-    {
-        <MudText Typo="Typo.caption" Color="@(_messageOk ? Color.Success : Color.Warning)">@message</MudText>
-    }
-</MudStack>
+</MudPaper>
 
 @code {
+    /// <summary>A conexão como está salva (numa nova, os valores iniciais).</summary>
     [Parameter, EditorRequired]
-    public ObsSession Session { get; set; } = default!;
+    public ObsConnection Connection { get; set; } = default!;
 
+    /// <summary>Sessão da conexão, para mostrar o estado. <c>null</c> numa conexão ainda não salva.</summary>
+    [Parameter]
+    public ObsSession? Session { get; set; }
+
+    [Parameter]
+    public bool IsNew { get; set; }
+
+    [Parameter]
+    public bool IsDefault { get; set; }
+
+    [Parameter]
+    public bool CanRemove { get; set; }
+
+    [Parameter]
+    public EventCallback<ObsConnection> OnSave { get; set; }
+
+    [Parameter]
+    public EventCallback OnRemove { get; set; }
+
+    [Parameter]
+    public EventCallback OnMakeDefault { get; set; }
+
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    private string? _name;
     private string? _host;
     private int _port;
     private string? _password;
     private bool _showPassword;
+    private bool _confirmRemove;
     private string? _message;
     private bool _messageOk;
+    private ObsSession? _watched;
 
-    protected override void OnInitialized()
+    protected override void OnInitialized() =>
+        (_name, _host, _port, _password) = (Connection.Name, Connection.Endpoint.Host, Connection.Endpoint.Port, Connection.Endpoint.Password);
+
+    protected override void OnParametersSet()
     {
-        var saved = ObsConnectionStore.Default.Load();
-        (_host, _port, _password) = (saved.Host, saved.Port, saved.Password);
-        Session.Changed += OnChanged;
+        if (ReferenceEquals(_watched, Session))
+            return;
+        if (_watched is not null)
+            _watched.Changed -= OnChanged;
+        _watched = Session;
+        if (_watched is not null)
+            _watched.Changed += OnChanged;
     }
 
-    public void Dispose() => Session.Changed -= OnChanged;
+    public void Dispose()
+    {
+        if (_watched is not null)
+            _watched.Changed -= OnChanged;
+    }
 
     private void OnChanged() => _ = InvokeAsync(StateHasChanged);
 
-    private void Save()
+    /// <summary>"Detectar" e o texto da senha dependem de o endereço digitado ser deste PC.</summary>
+    private bool TypedIsLocal => string.IsNullOrWhiteSpace(_host) || new ObsEndpoint(_host.Trim(), ObsEndpoint.DefaultPort, null).IsLocal;
+
+    private string PasswordHelp => TypedIsLocal
+        ? "No OBS: Ferramentas > Configurações do servidor WebSocket > Mostrar informações de conexão. Fica guardada criptografada só para o seu usuário do Windows."
+        : "No OBS do outro PC: Ferramentas > Configurações do servidor WebSocket > Mostrar informações de conexão. Lá, a porta precisa estar liberada no firewall do Windows. Fica guardada criptografada só para o seu usuário do Windows.";
+
+    private async Task Save()
     {
         var host = string.IsNullOrWhiteSpace(_host) ? ObsEndpoint.Default.Host : _host.Trim();
         var port = _port is > 0 and <= 65535 ? _port : ObsEndpoint.DefaultPort;
-        ObsConnectionStore.Default.Save(new ObsEndpoint(host, port, string.IsNullOrEmpty(_password) ? null : _password));
-        (_host, _port) = (host, port);
+        var endpoint = new ObsEndpoint(host, port, string.IsNullOrEmpty(_password) ? null : _password);
+        var name = string.IsNullOrWhiteSpace(_name) ? (endpoint.IsLocal ? ObsConnectionStore.LocalName : host) : _name.Trim();
+        (_name, _host, _port) = (name, host, port);
+        _confirmRemove = false;
         Show("Salvo. Conectando…", ok: true);
-        Session.Reconnect();
+        await OnSave.InvokeAsync(Connection with { Name = name, Endpoint = endpoint });
+    }
+
+    private async Task Remove()
+    {
+        if (!_confirmRemove)
+        {
+            _confirmRemove = true;
+            return;
+        }
+        _confirmRemove = false;
+        await OnRemove.InvokeAsync();
     }
 
     /// <summary>Lê a configuração do obs-websocket deste PC, só quando a pessoa pede.</summary>
@@ -87,8 +191,4 @@
     }
 
     private void Show(string text, bool ok) => (_message, _messageOk) = (text, ok);
-
-    private Severity StateSeverity => ConnectionStatus.StateSeverity(Session);
-
-    private string StateText => ConnectionStatus.Text(Session);
 }

@@ -5,14 +5,14 @@ using OpenWigiDash.ObsPlugin.Obs;
 using OpenWigiDash.ObsPlugin.Rendering;
 using OpenWigiDash.ObsPlugin.Settings;
 
-// Endereço e senha do obs-websocket: uma vez só, na página do plugin no manager.
+// Conexões com o obs-websocket (nome, endereço e senha): na página do plugin no manager. Cada widget escolhe uma.
 [assembly: OpenWigiPluginSettings(typeof(ObsPluginSettings))]
 
 namespace OpenWigiDash.ObsPlugin.Widgets;
 
 /// <summary>
-/// Base dos widgets do OBS. Cada função (Gravar, Live, Cena...) é um widget próprio no catálogo; todos usam a mesma
-/// <see cref="ObsSession"/>.
+/// Base dos widgets do OBS. Cada função (Gravar, Live, Cena...) é um widget próprio no catálogo; os widgets da mesma
+/// conexão usam a mesma <see cref="ObsSession"/>.
 /// </summary>
 public abstract class ObsWidgetBase : IWidget
 {
@@ -45,13 +45,14 @@ public abstract class ObsWidgetBase : IWidget
     public ValueTask LoadAsync(IWidgetHost host, CancellationToken cancellationToken)
     {
         _host = host;
-        ObsSession.Shared.UseLogger(host.LoggerFactory);
+        ObsSession.UseLoggerForAll(host.LoggerFactory);
         return ValueTask.CompletedTask;
     }
 
     public async ValueTask<IWidgetInstance> CreateInstanceAsync(IWidgetContext context, CancellationToken cancellationToken)
     {
         var instance = CreateInstance(context);
+        await instance.LoadConnectionAsync(cancellationToken).ConfigureAwait(false);
         await instance.LoadSettingsAsync(cancellationToken).ConfigureAwait(false);
         instance.Start();
         return instance;
@@ -81,8 +82,14 @@ public abstract class ObsTileInstance : IWidgetInstance
     private static readonly TimeSpan TickInterval = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan FeedbackLength = TimeSpan.FromSeconds(2.5);
 
-    private readonly IDisposable _lease;
+    /// <summary>Chave da conexão escolhida nas configurações da instância (sem ela, a padrão).</summary>
+    internal const string ConnectionKey = "connection";
+
+    private readonly Lock _sessionLock = new();
+    private readonly ObsConnectionStore _store = Store;
     private readonly CancellationTokenSource _stop = new();
+    private IDisposable? _lease;
+    private bool _started;
     private double? _press;
     private (string Text, bool Ok, DateTimeOffset Until)? _feedback;
     private bool _asleep;
@@ -90,18 +97,34 @@ public abstract class ObsTileInstance : IWidgetInstance
     protected ObsTileInstance(IWidgetContext context)
     {
         Context = context;
-        Session = SessionOverride ?? ObsSession.Shared;
-        Session.Changed += OnSessionChanged;
-        _lease = Session.Acquire();
+        Session = ResolveSession();
         _asleep = context.IsAsleep;
     }
 
-    /// <summary>Os testes trocam pela sessão ligada ao OBS simulado.</summary>
+    /// <summary>Os testes trocam pela sessão ligada ao OBS simulado (vale para qualquer conexão).</summary>
     internal static ObsSession? SessionOverride { get; set; }
+
+    /// <summary>Os testes dão uma sessão para cada id de conexão (cada uma ligada a um OBS simulado).</summary>
+    internal static Func<string, ObsSession>? SessionFactoryOverride { get; set; }
+
+    /// <summary>Onde estão as conexões (os testes trocam por um arquivo temporário).</summary>
+    internal static ObsConnectionStore? StoreOverride { get; set; }
+
+    internal static ObsConnectionStore Store => StoreOverride ?? ObsConnectionStore.Default;
 
     protected IWidgetContext Context { get; }
 
-    public ObsSession Session { get; }
+    /// <summary>A sessão da conexão deste widget. Muda quando a pessoa escolhe outra conexão.</summary>
+    public ObsSession Session { get; private set; }
+
+    /// <summary>Id da conexão escolhida, ou <c>null</c> para seguir a padrão.</summary>
+    public string? ConnectionId { get; private set; }
+
+    /// <summary>As conexões salvas, para o seletor da tela de configurações.</summary>
+    public ObsConnectionList Connections => _store.Load();
+
+    /// <summary>A conexão que o widget usa agora (a escolhida, ou a padrão se não escolheu ou ela foi apagada).</summary>
+    public ObsConnection Connection => Connections.Resolve(ConnectionId);
 
     protected ObsState Obs => Session.State;
 
@@ -132,6 +155,77 @@ public abstract class ObsTileInstance : IWidgetInstance
 
     protected internal virtual ValueTask LoadSettingsAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
+    /// <summary>Lê a conexão escolhida antes de abrir qualquer uma.</summary>
+    internal async ValueTask LoadConnectionAsync(CancellationToken cancellationToken)
+    {
+        ConnectionId = await Context.Settings.GetAsync(ConnectionKey, cancellationToken).ConfigureAwait(false);
+        lock (_sessionLock)
+            Session = ResolveSession();
+    }
+
+    /// <summary>A pessoa escolheu outra conexão (<c>null</c> = a padrão): salva e passa a usar a sessão dela.</summary>
+    public async Task SetConnectionAsync(string? connectionId)
+    {
+        ConnectionId = string.IsNullOrEmpty(connectionId) ? null : connectionId;
+        if (ConnectionId is null)
+            await Context.Settings.RemoveAsync(ConnectionKey).ConfigureAwait(false);
+        else
+            await Context.Settings.SetAsync(ConnectionKey, ConnectionId).ConfigureAwait(false);
+        SwitchSession();
+    }
+
+    private ObsSession ResolveSession()
+    {
+        if (SessionOverride is { } fixedSession)
+            return fixedSession;
+        var id = _store.Load().Resolve(ConnectionId).Id;
+        return SessionFactoryOverride?.Invoke(id) ?? ObsSession.For(id);
+    }
+
+    /// <summary>
+    /// Passa para a sessão da conexão atual, se mudou: solta medidor, miniatura e a conexão antiga e pega as da nova.
+    /// </summary>
+    private void SwitchSession()
+    {
+        lock (_sessionLock)
+        {
+            var next = ResolveSession();
+            if (ReferenceEquals(next, Session))
+            {
+                NotifyChanged();
+                return;
+            }
+            if (!_started)
+            {
+                Session = next;
+                return;
+            }
+            OnAwakeChanged(false);
+            Session.Changed -= OnSessionChanged;
+            var old = _lease;
+            Session = next;
+            Session.Changed += OnSessionChanged;
+            _lease = Session.Acquire();
+            old?.Dispose();
+            OnAwakeChanged(!_asleep);
+        }
+        Context.Logger.LogInformation("Widget do OBS passou para a conexão {Connection}.", Session.ConnectionId);
+        NotifyChanged();
+    }
+
+    /// <summary>A lista de conexões mudou: a padrão pode ser outra, ou a escolhida pode ter sido apagada.</summary>
+    private void OnConnectionsSaved()
+    {
+        try
+        {
+            SwitchSession();
+        }
+        catch (Exception ex)
+        {
+            Context.Logger.LogWarning(ex, "Falha ao trocar a conexão do widget do OBS.");
+        }
+    }
+
     /// <summary>Desenho com o OBS pronto.</summary>
     protected abstract TileVisual GetVisual();
 
@@ -154,6 +248,13 @@ public abstract class ObsTileInstance : IWidgetInstance
 
     internal void Start()
     {
+        lock (_sessionLock)
+        {
+            Session.Changed += OnSessionChanged;
+            _lease = Session.Acquire();
+            _started = true;
+        }
+        _store.Saved += OnConnectionsSaved;
         OnAwakeChanged(!_asleep);
         _ = TickLoopAsync(_stop.Token);
     }
@@ -167,7 +268,8 @@ public abstract class ObsTileInstance : IWidgetInstance
         (string Text, Color Dot)? offline = Session.ConnectionState switch
         {
             ObsConnectionState.Ready => null,
-            ObsConnectionState.Unavailable => ("OBS fechado", TilePalette.Record),
+            // Fora deste PC não dá para saber se é o OBS fechado ou o PC desligado.
+            ObsConnectionState.Unavailable => (Session.IsLocal ? "OBS fechado" : "Sem resposta", TilePalette.Record),
             ObsConnectionState.NeedsPassword => ("Falta a senha", TilePalette.Warn),
             ObsConnectionState.AuthFailed => ("Senha errada", TilePalette.Record),
             ObsConnectionState.Unsupported => ("Atualize o OBS", TilePalette.Warn),
@@ -273,9 +375,15 @@ public abstract class ObsTileInstance : IWidgetInstance
     public virtual ValueTask DisposeAsync()
     {
         _stop.Cancel();
+        _store.Saved -= OnConnectionsSaved;
         OnAwakeChanged(false);
-        Session.Changed -= OnSessionChanged;
-        _lease.Dispose();
+        lock (_sessionLock)
+        {
+            Session.Changed -= OnSessionChanged;
+            _lease?.Dispose();
+            _lease = null;
+            _started = false;
+        }
         _stop.Dispose();
         GC.SuppressFinalize(this);
         return ValueTask.CompletedTask;

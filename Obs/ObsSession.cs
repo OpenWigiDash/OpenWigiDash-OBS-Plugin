@@ -24,8 +24,8 @@ public enum ObsConnectionState
 }
 
 /// <summary>
-/// Conexão com o OBS pelo obs-websocket v5. Uma só por plugin, aberta enquanto houver widget na tela; todos os
-/// tiles leem o mesmo <see cref="ObsState"/>.
+/// Conexão com um OBS pelo obs-websocket v5. Uma por conexão salva (<see cref="For"/>), aberta enquanto houver widget
+/// dela na tela; os tiles da mesma conexão leem o mesmo <see cref="ObsState"/>.
 /// </summary>
 /// <remarks>
 /// <list type="bullet">
@@ -49,7 +49,31 @@ public sealed partial class ObsSession : IAsyncDisposable
 
     private const ObsProtocol.Events BaseEvents = ObsProtocol.Events.All;
 
-    public static ObsSession Shared { get; } = new(TimeProvider.System, () => ObsConnectionStore.Default.Load(), log: DiagnosticLog.Default);
+    private static readonly ConcurrentDictionary<string, ObsSession> Sessions = new(StringComparer.Ordinal);
+    private static ILoggerFactory? _loggerFactory;
+
+    /// <summary>
+    /// A sessão da conexão <paramref name="connectionId"/>, criada na primeira vez. Criar não conecta: só abre quando um
+    /// widget chama <see cref="Acquire"/>.
+    /// </summary>
+    public static ObsSession For(string connectionId) => Sessions.GetOrAdd(connectionId, id =>
+    {
+        var session = new ObsSession(TimeProvider.System, () => ObsConnectionStore.Default.Endpoint(id), log: DiagnosticLog.Default.For(id))
+        {
+            ConnectionId = id,
+        };
+        if (_loggerFactory is { } factory)
+            session.UseLogger(factory);
+        return session;
+    });
+
+    /// <summary>Logger do host para todas as sessões, as que já existem e as que vierem.</summary>
+    public static void UseLoggerForAll(ILoggerFactory factory)
+    {
+        _loggerFactory = factory;
+        foreach (var session in Sessions.Values)
+            session.UseLogger(factory);
+    }
 
     private readonly Func<ObsEndpoint> _endpoint;
     private readonly TimeSpan[] _backoff;
@@ -82,6 +106,9 @@ public sealed partial class ObsSession : IAsyncDisposable
     }
 
     public ObsState State { get; }
+
+    /// <summary>Id da conexão salva desta sessão (<c>null</c> nos testes).</summary>
+    public string? ConnectionId { get; init; }
 
     public ObsConnectionState ConnectionState { get; private set; } = ObsConnectionState.Connecting;
 

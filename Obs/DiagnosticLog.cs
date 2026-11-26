@@ -9,10 +9,15 @@ namespace OpenWigiDash.ObsPlugin.Obs;
 internal sealed class DiagnosticLog
 {
     private const long MaxBytes = 256 * 1024;
-    private readonly Lock _lock = new();
+    /// <summary>Um arquivo para todas as conexões: o cadeado é de todas as instâncias.</summary>
+    private static readonly Lock FileLock = new();
     private readonly string? _path;
+    private readonly string? _tag;
 
-    public DiagnosticLog(string? path) => _path = path;
+    public DiagnosticLog(string? path, string? tag = null) => (_path, _tag) = (path, tag);
+
+    /// <summary>O mesmo arquivo, com o nome da conexão no começo de cada linha.</summary>
+    public DiagnosticLog For(string tag) => new(_path, tag);
 
     public static DiagnosticLog Default { get; } = new(System.IO.Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -26,13 +31,13 @@ internal sealed class DiagnosticLog
             return;
         try
         {
-            lock (_lock)
+            lock (FileLock)
             {
                 Directory.CreateDirectory(System.IO.Path.GetDirectoryName(_path)!);
                 var info = new FileInfo(_path);
                 if (info.Exists && info.Length > MaxBytes)
                     File.Move(_path, System.IO.Path.ChangeExtension(_path, ".old.log"), overwrite: true);
-                var line = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture) + "  " + message;
+                var line = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture) + "  " + (_tag is null ? "" : $"[{_tag}] ") + message;
                 if (exception is not null)
                     line += Environment.NewLine + exception;
                 File.AppendAllText(_path, line + Environment.NewLine);
