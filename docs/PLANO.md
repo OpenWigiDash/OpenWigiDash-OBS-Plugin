@@ -7,7 +7,11 @@ Plano aprovado: <https://claude.ai/artifact/LaKXkHGSTVDk6iK9yXx6T9>. Protótipos
 
 - **Protocolo**: obs-websocket v5 (vem no OBS 28+). O plugin do Stream Deck usa um protocolo privado do Elgato
   que exige o plugin deles instalado no OBS; não seguimos esse caminho.
-- **Uma conexão para todos os tiles** (`ObsSession.Shared`): abre com o primeiro widget e fecha com o último.
+- **Uma sessão por conexão salva** (`ObsSession.For(id)`): abre com o primeiro widget daquela conexão e fecha com o
+  último. Cada widget escolhe a conexão (chave `connection` da instância) ou segue a padrão; apagada, cai na padrão.
+  Antes era uma conexão só (`connection.json`), que vira a padrão com id `local`.
+- **Sem checar processo**: o estado vem do WebSocket. "OBS fechado", abrir o OBS e "Detectar" só em conexão local
+  (loopback, `localhost`, nome ou IP deste PC); em conexão remota o tile diz "Sem resposta".
   Reconecta sozinha (1, 2, 5, 10, 30 s); com senha faltando ou errada espera 1 min, ou tenta na hora quando a pessoa salva.
 - **Senha** guardada com DPAPI (usuário do Windows). "Detectar neste PC" lê o `config.json` do obs-websocket só quando clicado.
 - **Medidor de áudio** (evento `InputVolumeMeters`, ~20 por segundo) só é assinado enquanto há um mixer acordado

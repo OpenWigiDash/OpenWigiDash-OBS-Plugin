@@ -1,28 +1,47 @@
 @inherits WidgetSettingsComponent<ObsTileInstance>
 @implements IDisposable
 
-@* Configurações de qualquer widget do OBS. A conexão é do plugin inteiro e fica na página do plugin; aqui só o estado
-   dela, com o caminho para lá quando falta algo, e as opções do widget, se ele tiver. *@
+@* Configurações de qualquer widget do OBS: qual conexão ele usa (quando há mais de uma), o estado dela, com o caminho
+   para a página do plugin quando falta algo, e as opções do widget, se ele tiver. Endereço e senha ficam na página do
+   plugin, uma vez para todos os widgets. *@
 <MudStack Spacing="4">
+    @{
+        var connections = Instance.Connections;
+        var multiple = connections.Connections.Count > 1;
+        var name = multiple ? Instance.Connection.Name : null;
+    }
+    @if (multiple)
+    {
+        <MudSelect T="string" Value="@(Instance.ConnectionId is { } id && connections.Find(id) is not null ? id : DefaultChoice)"
+                   ValueChanged="Choose" Label="Conexão" Variant="Variant.Outlined" Style="min-width:280px"
+                   HelperText="Qual OBS este widget controla.">
+            <MudSelectItem Value="@DefaultChoice">@($"Padrão ({connections.Default.Name})")</MudSelectItem>
+            @foreach (var connection in connections.Connections)
+            {
+                <MudSelectItem Value="@connection.Id">@connection.Name</MudSelectItem>
+            }
+        </MudSelect>
+    }
+
     @if (Instance.Session.ConnectionState is ObsConnectionState.Ready)
     {
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
             <MudIcon Icon="@Icons.Material.Filled.Circle" Color="Color.Success" Size="Size.Small" />
-            <MudText Typo="Typo.body2">@ConnectionStatus.Text(Instance.Session)</MudText>
+            <MudText Typo="Typo.body2">@ConnectionStatus.Text(Instance.Session, name)</MudText>
         </MudStack>
     }
     else
     {
         <MudAlert Severity="@ConnectionStatus.StateSeverity(Instance.Session)" Dense="true" Variant="Variant.Outlined">
-            <MudText Typo="Typo.body2">@ConnectionStatus.Text(Instance.Session)</MudText>
+            <MudText Typo="Typo.body2">@ConnectionStatus.Text(Instance.Session, name)</MudText>
             @* Conectando é passageiro; nos outros estados falta algo (senha, endereço, OBS aberto). *@
             @if (Instance.Session.ConnectionState is not ObsConnectionState.Connecting)
             {
                 <MudText Typo="Typo.caption" Style="display:block" Class="mt-1">
-                    Endereço e senha valem para todos os widgets do OBS e ficam na página do plugin.
+                    Endereço e senha das conexões ficam na página do plugin.
                 </MudText>
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" Class="mt-2"
-                           StartIcon="@Icons.Material.Filled.Settings" OnClick="OpenPluginSettings">Configurar a conexão</MudButton>
+                           StartIcon="@Icons.Material.Filled.Settings" OnClick="OpenPluginSettings">Configurar as conexões</MudButton>
                 @if (_noPluginPage)
                 {
                     <MudText Typo="Typo.caption" Style="display:block" Class="mt-1">
@@ -41,11 +60,16 @@
 </MudStack>
 
 @code {
+    /// <summary>No seletor, "seguir a padrão" (não salva conexão no widget).</summary>
+    private const string DefaultChoice = "*";
+
     private bool _noPluginPage;
 
     protected override void OnInitialized() => Instance.Changed += OnChanged;
 
     public void Dispose() => Instance.Changed -= OnChanged;
+
+    private Task Choose(string value) => Instance.SetConnectionAsync(value == DefaultChoice ? null : value);
 
     // O manager abre a página do plugin na aba Configurações. Se não abriu, diz onde fica.
     private async Task OpenPluginSettings() => _noPluginPage = !await Context.OpenPluginSettingsAsync();

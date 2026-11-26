@@ -1,20 +1,100 @@
 @inherits PluginSettingsComponent
 @implements IDisposable
 
-@* Página do plugin no manager (Loja > OBS > Configurar): endereço e senha do obs-websocket, uma vez só para todos os
-   widgets do OBS. Enquanto a página está aberta ela segura a sessão, para mostrar o estado e testar a conexão mesmo
-   sem nenhum widget do OBS no layout. *@
-<ConnectionPanel Session="_session" />
+@* Página do plugin no manager (Loja > OBS > Configurar): as conexões com o obs-websocket (um OBS neste PC, outro em
+   outro PC da rede...). Cada widget do OBS escolhe uma na tela dele; quem não escolheu usa a padrão. Enquanto a
+   página está aberta ela segura a sessão de cada conexão, para mostrar o estado e testar mesmo sem widget no layout. *@
+<MudStack Spacing="3">
+    <MudText Typo="Typo.body2">
+        Cada widget do OBS escolhe uma destas conexões na tela de configurações dele. Quem não escolheu usa a padrão.
+    </MudText>
+
+    @foreach (var connection in _list.Connections)
+    {
+        <ConnectionPanel @key="connection.Id" Connection="connection" Session="SessionFor(connection.Id)"
+                         IsDefault="@(connection.Id == _list.DefaultId)" CanRemove="@(_list.Connections.Count > 1)"
+                         OnSave="Save" OnRemove="() => Remove(connection.Id)" OnMakeDefault="() => MakeDefault(connection.Id)" />
+    }
+
+    @if (_draft is { } draft)
+    {
+        <ConnectionPanel @key="draft.Id" Connection="draft" IsNew="true" OnSave="Save" OnCancel="() => _draft = null" />
+    }
+    else
+    {
+        <div>
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Add" OnClick="Add">Adicionar conexão</MudButton>
+        </div>
+    }
+</MudStack>
 
 @code {
-    private readonly ObsSession _session = ObsTileInstance.SessionOverride ?? ObsSession.Shared;
-    private IDisposable? _lease;
+    private readonly Dictionary<string, IDisposable> _leases = new(StringComparer.Ordinal);
+    private ObsConnectionList _list = default!;
+    private ObsConnection? _draft;
+
+    private static ObsConnectionStore Store => ObsTileInstance.Store;
 
     protected override void OnInitialized()
     {
-        _session.UseLogger(Host.LoggerFactory);
-        _lease = _session.Acquire();
+        ObsSession.UseLoggerForAll(Host.LoggerFactory);
+        _list = Store.Load();
+        HoldSessions();
     }
 
-    public void Dispose() => _lease?.Dispose();
+    public void Dispose()
+    {
+        foreach (var lease in _leases.Values)
+            lease.Dispose();
+        _leases.Clear();
+    }
+
+    private static ObsSession SessionFor(string id) => ObsTileInstance.SessionOverride ?? ObsSession.For(id);
+
+    /// <summary>Uma sessão aberta para cada conexão da lista; solta as que saíram.</summary>
+    private void HoldSessions()
+    {
+        foreach (var id in _leases.Keys.Where(id => _list.Find(id) is null).ToList())
+        {
+            _leases[id].Dispose();
+            _leases.Remove(id);
+        }
+        foreach (var connection in _list.Connections)
+        {
+            if (!_leases.ContainsKey(connection.Id))
+                _leases[connection.Id] = SessionFor(connection.Id).Acquire();
+        }
+    }
+
+    private void Add() => _draft = new ObsConnection(ObsConnectionStore.NewId(), "", new ObsEndpoint("", ObsEndpoint.DefaultPort, null));
+
+    private void Save(ObsConnection connection)
+    {
+        var current = Store.Load();
+        var connections = current.Connections.Any(c => c.Id == connection.Id)
+            ? current.Connections.Select(c => c.Id == connection.Id ? connection : c).ToList()
+            : [.. current.Connections, connection];
+        Persist(current with { Connections = connections });
+        if (_draft?.Id == connection.Id)
+            _draft = null;
+        SessionFor(connection.Id).Reconnect();
+    }
+
+    private void Remove(string id)
+    {
+        var current = Store.Load();
+        if (current.Connections.Count <= 1)
+            return;
+        var connections = current.Connections.Where(c => c.Id != id).ToList();
+        Persist(new ObsConnectionList(connections, current.DefaultId == id ? connections[0].Id : current.DefaultId));
+    }
+
+    private void MakeDefault(string id) => Persist(Store.Load() with { DefaultId = id });
+
+    private void Persist(ObsConnectionList list)
+    {
+        Store.Save(list);
+        _list = Store.Load();
+        HoldSessions();
+    }
 }
